@@ -1,9 +1,9 @@
 from __future__ import division
-import pickle
-import numpy
 
+import pickle
 import time
 
+import numpy
 
 
 def run_tti_sim(model, T, max_dt=None,
@@ -26,6 +26,10 @@ def run_tti_sim(model, T, max_dt=None,
     # (0:Mon, 1:Tue, 2:Wed, 3:Thu, 4:Fri, 5:Sat, 6:Sun, 7:Mon, 8:Tues, ...)
     # For each cadence, testing is done on the day numbers included in the associated list.
 
+    # TODO: have the cadence assign different people to different testing days
+    # for example, group 1 have [0, 7, 14, 21]
+    # group 2 have [1, 8, 15, 22], and so on
+
     if(cadence_testing_days is None):
         cadence_testing_days    = {
                                     'everyday':     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
@@ -38,6 +42,10 @@ def run_tti_sim(model, T, max_dt=None,
                                 }
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    # TODO: temporal false negative rates should also take into account group testing
+    # currently it's just for individual testing
+    # we probably also want to change these numbers since they are pretty high
 
     if(temporal_falseneg_rates is None):
         temporal_falseneg_rates = { 
@@ -97,6 +105,9 @@ def run_tti_sim(model, T, max_dt=None,
         # Execute testing policy at designated intervals:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+        # TODO: this logic needs change, since we test different people on different days
+        # so the "global timer" model.t doesn't dictate whether we execute testing on everybody or not
+        
         if(int(model.t)!=int(timeOfLastIntervention)):
         
             cadenceDayNumbers = [int(model.t % cadence_cycle_length)]
@@ -191,7 +202,7 @@ def run_tti_sim(model, T, max_dt=None,
 
                     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
+                    # TODO: modify testing here to take temporal FNR based on group testing
                     #----------------------------------------
                     # Allow SYMPTOMATIC individuals to self-seek tests
                     # regardless of cadence testing days
@@ -274,6 +285,8 @@ def run_tti_sim(model, T, max_dt=None,
                     #----------------------------------------
 
                     selectedToTest = numpy.concatenate((symptomaticSelection, tracingSelection, randomSelection)).astype(int)
+
+                    # TODO: can we plug in pooling here and operate on the list of selected-to-test individuals
 
                     numTested                     = 0
                     numTested_random              = 0
