@@ -46,6 +46,8 @@ def run_tti_sim(model, T, max_dt=None,
     # TODO: temporal false negative rates should also take into account group testing
     # currently it's just for individual testing
     # we probably also want to change these numbers since they are pretty high
+    # TODO: also, what does this imply for pooling people at different stages of their disease?
+    # designate temporal VL; start w fixed and same for everyone? then add randomness?
 
     if(temporal_falseneg_rates is None):
         temporal_falseneg_rates = { 
@@ -85,7 +87,7 @@ def run_tti_sim(model, T, max_dt=None,
     running     = True
     while running:
 
-        running = model.run_iteration(max_dt=max_dt)
+        running = model.run_iteration(max_dt=max_dt) # NOTE: max_dt is None by default, in which case max_dt is set to model.tmax=T
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Introduce exogenous exposures randomly:
@@ -110,7 +112,8 @@ def run_tti_sim(model, T, max_dt=None,
         
         if(int(model.t)!=int(timeOfLastIntervention)):
         
-            cadenceDayNumbers = [int(model.t % cadence_cycle_length)]
+            cadenceDayNumbers = [int(model.t % cadence_cycle_length)] # NOTE: this is a list of one number, why do that?
+
 
             if(backlog_skipped_intervals):
                 cadenceDayNumbers = [int(i % cadence_cycle_length) for i in numpy.arange(start=timeOfLastIntervention, stop=int(model.t), step=1.0)[1:]] + cadenceDayNumbers
@@ -287,6 +290,14 @@ def run_tti_sim(model, T, max_dt=None,
                     selectedToTest = numpy.concatenate((symptomaticSelection, tracingSelection, randomSelection)).astype(int)
 
                     # TODO: can we plug in pooling here and operate on the list of selected-to-test individuals
+                    # let's disable contact tracing to avoid distraction
+                    # do we want to keep symptomatic testing?
+
+                    # Get the list of ppl selected to test on this day
+                    # get their viral loads aat this time point
+                    # create pools
+                    # return test results
+                    # use another function that inputs (list of IDs, list of VL, pool size) and outputs (test result, test consumption)
 
                     numTested                     = 0
                     numTested_random              = 0

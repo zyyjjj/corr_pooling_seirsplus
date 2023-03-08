@@ -1,12 +1,9 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import networkx as networkx
 import numpy as numpy
 import scipy as scipy
 import scipy.integrate
-
 
 ########################################################
 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#
@@ -1799,6 +1796,7 @@ class ExtSEIRSNetworkModel():
         self.timer_state     = numpy.zeros((self.numNodes,1))
         self.timer_isolation = numpy.zeros(self.numNodes)
         self.isolationTime   = isolation_time
+        # TODO: add a timer for how long each person has been infected (this maps to VL)
         
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Initialize Counts of inidividuals with each state:
@@ -1846,6 +1844,8 @@ class ExtSEIRSNetworkModel():
                                + [self.Q_R]*int(self.numQ_R[0])
                             ).reshape((self.numNodes,1))
         numpy.random.shuffle(self.X)
+        # TODO: initialize viral array self.VL, make sure to match to self.X before shuffling
+        # then apply the same shuffle
 
         self.store_Xseries = store_Xseries
         if(store_Xseries):
@@ -2004,6 +2004,8 @@ class ExtSEIRSNetworkModel():
         #----------------------------------------
         # Testing-related parameters:
         #----------------------------------------
+        # TODO: may need to update psi every time step, depending on how many days you've been in which disease state
+
         self.beta_Q         = (numpy.array(self.parameters['beta_Q']).reshape((self.numNodes, 1))       if isinstance(self.parameters['beta_Q'], (list, numpy.ndarray)) else numpy.full(fill_value=self.parameters['beta_Q'], shape=(self.numNodes,1))) if self.parameters['beta_Q'] is not None else self.beta
         self.sigma_Q        = (numpy.array(self.parameters['sigma_Q']).reshape((self.numNodes, 1))      if isinstance(self.parameters['sigma_Q'], (list, numpy.ndarray)) else numpy.full(fill_value=self.parameters['sigma_Q'], shape=(self.numNodes,1))) if self.parameters['sigma_Q'] is not None else self.sigma
         self.lamda_Q        = (numpy.array(self.parameters['lamda_Q']).reshape((self.numNodes, 1))      if isinstance(self.parameters['lamda_Q'], (list, numpy.ndarray)) else numpy.full(fill_value=self.parameters['lamda_Q'], shape=(self.numNodes,1))) if self.parameters['lamda_Q'] is not None else self.lamda
@@ -2426,6 +2428,7 @@ class ExtSEIRSNetworkModel():
                                      propensities_StoQS, propensities_EtoQE, propensities_IPREtoQPRE, propensities_ISYMtoQSYM, propensities_IASYMtoQASYM, 
                                      propensities_QStoQE, propensities_QEtoQPRE, propensities_QPREtoQSYM, propensities_QPREtoQASYM, 
                                      propensities_QSYMtoQR, propensities_QSYMtoH, propensities_QASYMtoQR, propensities_RtoS, propensities__toS])
+        # NOTE: columns of propensities = different transitions; rows: different nodes
 
         columns = [ 'StoE', 'EtoIPRE', 'IPREtoISYM', 'IPREtoIASYM',
                     'ISYMtoR', 'ISYMtoH', 'IASYMtoR', 'HtoR', 'HtoF', 
@@ -2608,26 +2611,26 @@ class ExtSEIRSNetworkModel():
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         propensities, transitionTypes = self.calc_propensities()
 
-        if(propensities.sum() > 0):
+        if(propensities.sum() > 0): # NOTE: transition only happens if someone has the propensity to do so, not according to discrete time steps
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Calculate alpha
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            propensities_flat   = propensities.ravel(order='F')
+            propensities_flat   = propensities.ravel(order='F') # flatten in column-major order, p_f[num_Nodes*transitionTypeIdx+nodeIdx]=propensity[nodeIdx, transitionTypeIdx]
             cumsum              = propensities_flat.cumsum()
-            alpha               = propensities_flat.sum()
+            alpha               = propensities_flat.sum() # NOTE: rate of the most immediate next transition among all
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Compute the time until the next event takes place
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            tau = (1/alpha)*numpy.log(float(1/r1))
+            tau = (1/alpha)*numpy.log(float(1/r1)) # TODO: understand why log(1/r1) here
 
             if(tau > max_dt):
                 # If the time to next event exceeds the max allowed interval,
                 # advance the system time by the max allowed interval,
                 # but do not execute any events (recalculate Gillespie interval/event next iteration)
                 self.t += max_dt
-                self.timer_state += max_dt
+                self.timer_state += max_dt # NOTE: timer_state records how long each node has been in its current state
                 # Update testing and isolation timers/statuses
                 isolatedNodes = numpy.argwhere((self.X==self.Q_S)|(self.X==self.Q_E)|(self.X==self.Q_pre)|(self.X==self.Q_sym)|(self.X==self.Q_asym)|(self.X==self.Q_R))[:,0].flatten()
                 self.timer_isolation[isolatedNodes] = self.timer_isolation[isolatedNodes] + max_dt
@@ -2643,8 +2646,9 @@ class ExtSEIRSNetworkModel():
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Compute which event takes place
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            transitionIdx   = numpy.searchsorted(cumsum,r2*alpha)
-            transitionNode  = transitionIdx % self.numNodes
+            # NOTE: cumsum has size (number of types of transitions) * (number of nodes)
+            transitionIdx   = numpy.searchsorted(cumsum,r2*alpha) # NOTE: randomly pick a transition (specific to a node and a transition type)
+            transitionNode  = transitionIdx % self.numNodes 
             transitionType  = transitionTypes[ int(transitionIdx/self.numNodes) ]
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2655,7 +2659,7 @@ class ExtSEIRSNetworkModel():
 
             self.testedInCurrentState[transitionNode] = False
 
-            self.timer_state[transitionNode] = 0.0
+            self.timer_state[transitionNode] = 0.0 # reset timer, since transitionNode is in a new state
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2719,6 +2723,8 @@ class ExtSEIRSNetworkModel():
         nodesExitingIsolation = numpy.argwhere(self.timer_isolation >= self.isolationTime)
         for isoNode in nodesExitingIsolation:
             self.set_isolation(node=isoNode, isolate=False)
+
+        # TODO: update group testing related states here, e.g. psi,
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Store system states
@@ -3225,3 +3231,4 @@ class ExtSEIRSNetworkModel():
 
 
 
+ 
