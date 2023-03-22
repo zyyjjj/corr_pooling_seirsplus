@@ -54,6 +54,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         The logic is TBD
 
         This function should be called every time after update_VL() is called
+        or maybe combine the two into one function
         """
 
         # TODO: think through what logic to use
@@ -62,3 +63,10 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
 
 
+
+    def run_iteration(self, max_dt=None):
+        # return super().run_iteration(max_dt)
+        # TODO: copy over all the steps
+        # and update VL and beta at the end
+
+        # there seems to be no other cleaner way to do this

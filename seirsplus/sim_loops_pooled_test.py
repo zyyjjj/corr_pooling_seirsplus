@@ -62,6 +62,9 @@ def run_tti_sim_screening(model, T, screening_assignment, max_dt=None,
         for test_subject in testingPool:
             if nodeStates[test_subject] in isolation_states:
                 testingPool.remove(test_subject)
+            
+        model.update_VL()
+        model.update_beta_given_VL()
 
         # TODO:
         # then call group_testing on testingPool
