@@ -5,14 +5,13 @@ import setuptools
 
 setuptools.setup(
     packages=setuptools.find_packages(),
-    name="seirsplus",
-    version='1.0.9',
-    description='Models of SEIRS epidemic dynamics with extensions, including network-structured populations, testing, contact tracing, and social distancing.',
+    name="corr_pooling_seirsplus",
+    version='0.1',
+    description='Models of SEIRS epidemic dynamics with extensions, including network-structured populations, testing, contact tracing, and social distancing. Large-scale screening through pooled testing.',
     # long_description=long_description,
     # long_description_content_type="text/markdown",
-    url="https://github.com/ryansmcgee/SEIRS-network-model",
-    author='Ryan Seamus McGee',
-    author_email='ryansmcgee@gmail.com',
+    url="https://github.com/zyyjjj/corr_pooling_seirsplus",
+    author='Jiayue Wan, Yujia Zhang',
     license='MIT',
-    install_requires=['numpy', 'scipy', 'networkx'],
+    install_requires=['numpy', 'scipy', 'networkx', "scikit-learn", "node2vec"],
     zip_safe=False)
