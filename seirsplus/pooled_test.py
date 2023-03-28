@@ -51,7 +51,7 @@ class OneStageGroupTesting:
                     )
                 )
             else:
-                res.append([0] * len(vl_))             
+                res.append([False] * len(vl_))             
         return res
 
 
@@ -81,7 +81,7 @@ def run_one_PCR_test(
     
     if individual:
         N_templates = np.random.binomial(V_sample * np.array(mu, dtype=int), c_1 * xi * c_2)    
-        return N_templates >= LoD
+        return list(N_templates >= LoD)
 
     pool_size = len(mu)
     # copies of RNA in a subsample that is c_1 of the original volume
