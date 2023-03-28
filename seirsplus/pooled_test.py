@@ -35,7 +35,14 @@ class OneStageGroupTesting:
         self.pool_size = len(ids[0])
     
     def run_one_stage_group_testing(self, seed: int = 0):
-        """Run one-stage hierarchical group testing."""
+        """Run one-stage hierarchical group testing.
+        
+        Args:
+            seed: random seed used for one-stage group testing.
+            
+        Returns:
+            A list of list of booleans indicating the group testing results. 
+        """
         res = []
         np.random.seed(seed)
         
