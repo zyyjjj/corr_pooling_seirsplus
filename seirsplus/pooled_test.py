@@ -60,6 +60,7 @@ class OneStageGroupTesting:
             else:
                 res.append([False] * len(vl_))             
         return res
+    # TODO: should also return diagnostics like FNR, test consumption
 
 
 def run_one_PCR_test(
