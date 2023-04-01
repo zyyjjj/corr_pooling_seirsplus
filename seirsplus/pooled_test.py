@@ -1,14 +1,14 @@
 from typing import Dict, List, Optional, Union
-import numpy as np
 
+import numpy as np
 
 PCR_PARAMS = {
     'V_sample': 1, 
-    'c_1': 1/10, 
-    'xi': 1/2, 
+    'c_1': 1/10, # V_subsample/V_sample, fraction of original sample volume used for PCR test
+    'xi': 1/2, # probability that each RNA copy attaches to the glass fiber plate (indep)
     'c_2': 1, 
-    'LoD': 100,
-}  # c_1 = V_subsample / V_sample
+    'LoD': 100, # limit of detection
+} 
 
 
 class OneStageGroupTesting:
@@ -67,7 +67,7 @@ def run_one_PCR_test(
     individual: bool, 
     params: Dict[str, Union[float, int]], 
 ) -> List[int]:
-    """Perform a single PCR test
+    """Perform a single PCR test.
 
     Args:
         mu: viral loads (copies/mL) in the samples.
