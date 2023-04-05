@@ -12,19 +12,18 @@ from viral_model import ViralExtSEIRNetworkModel
 # from screening_assignment import assign # TODO: in progress, add when finished
 
 
-class Screening:
+class SimulationRunner:
 
     def __init__(
         self,
         model: ViralExtSEIRNetworkModel, 
         T: int, 
-        screening_assignment: Dict[Tuple[List]], 
+        screening_assignment: Dict[Tuple[List]],  # TODO: Jiayue to provide this
         seed: int,
         max_dt: int = None,
         cadence_cycle_length: int = 28, 
-        output_path: str = None
+        output_path: str = None,
     ):
-        
         r"""
         Args:
             model: a `ViralExtSEIRNetworkModel` 
@@ -92,11 +91,12 @@ class Screening:
         # TODO: assign screening_group to individual pools, 
         # return a nested list called `screening_group_pools`
         # also fetch the viral loads and put in nested list `screening_group_VL`
+        # individual_pools = assign(screening_group, self.model.VL)
 
         # TODO: then call group_testing
         # group_testing = OneStageGroupTesting(ids = screening_group_pools, viral_loads = screening_group_VL)
         # test_results, diagnostics = group_testing.run_one_stage_group_testing(seed=self.seed)
-
+        
         # TODO: pass test_results to update isolation status in self.model
             # model.set_positive(node, True)
             # model.set_isolation(node, True)
@@ -104,13 +104,13 @@ class Screening:
         # TODO: save self.results to self.output_path
 
 
-    def run_screening_full(self):
+    def run_simulation(self):
         r"""
         Run screening for the full duration self.T.
         """
 
         dayOfLastIntervention = 0
-        self.model.tmax  = T
+        self.model.tmax  = self.T
         running = True
         
         while running:
@@ -121,12 +121,12 @@ class Screening:
             # make sure we don't skip any days due to the transition
             # implement testing on each day
             while dayOfLastIntervention <= int(self.model.t):
-                cadenceDayNumber = int(dayOfLastIntervention % cadence_cycle_length)
+                cadenceDayNumber = int(dayOfLastIntervention % self.cadence_cycle_length)
                 screening_group_id = self.day_to_screening_group[cadenceDayNumber]
                 self.run_screening_one_day(screening_group_id)
                 dayOfLastIntervention += 1
             
-            if dayOfLastIntervention > T:
+            if dayOfLastIntervention > self.T:
                 running = False
 
 
