@@ -85,8 +85,8 @@ class SimulationRunner:
             if nodeStates[test_subject] in self.isolation_states:
                 screening_group.remove(test_subject)
             
-        self.model.update_VL() # TODO: to implement
-        self.model.update_beta_given_VL() # TODO: to implement
+        self.model.update_VL(nodes_to_exclude = [self.transitionNode]) # TODO: to implement; update VL for everyone except self.model.transitionNode
+        self.model.update_beta_given_VL(n) # TODO: to implement
 
         # TODO: assign screening_group to individual pools, 
         # return a nested list called `screening_group_pools`
@@ -100,6 +100,10 @@ class SimulationRunner:
         # TODO: pass test_results to update isolation status in self.model
             # model.set_positive(node, True)
             # model.set_isolation(node, True)
+        
+        # TODO: when we isolate someone through testing
+        # make sure to change their state in model from X to QX
+
         # TODO: save diagnostics in self.results
         # TODO: save self.results to self.output_path
 
