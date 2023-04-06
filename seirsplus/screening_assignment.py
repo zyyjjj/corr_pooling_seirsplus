@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import networkx as nx
 import numpy as np
@@ -13,7 +13,7 @@ from sklearn.cluster import KMeans
 # https://github.com/eliorc/node2vec
 def _embed_nodes(
     graph: Graph,
-    dimensions: int = 2,
+    dimensions: int = 32,
     walk_length: int = 20,
     num_walks: int = 10,
     workers: int = 4,
@@ -48,9 +48,9 @@ def _get_equal_sized_clusters(
     model: Word2Vec,
     graph: Graph, 
     cluster_size: int,
+    key_to_index: Optional[Dict[Any, int]] = None,
 ) -> Dict[Any, int]:
-    """
-    
+    """ 
     Running KMeans then finding the minimal matching of points to clusters 
     under the constraint of maximal points assigned to cluster (cluster size)
     Args:
@@ -64,9 +64,13 @@ def _get_equal_sized_clusters(
     kmeans.fit(X)
     centers = kmeans.cluster_centers_
     centers = centers.reshape(-1, 1, X.shape[-1]).repeat(cluster_size, 1).reshape(-1, X.shape[-1])
+    
     distance_matrix = cdist(X, centers)
     clusters = linear_sum_assignment(distance_matrix)[1]//cluster_size
-    clusters = {i: clusters[model.wv.key_to_index[i]] for i in graph.nodes()}
+    if key_to_index is None:
+        clusters = {i: clusters[model.wv.key_to_index[i]] for i in graph.nodes()}
+    else:
+        clusters = {i: clusters[key_to_index[i]] for i in graph.nodes()}
 
     return clusters
 
