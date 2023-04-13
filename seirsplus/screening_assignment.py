@@ -1,6 +1,5 @@
 from typing import Any, Dict, Optional, Tuple
 
-import networkx as nx
 import numpy as np
 from gensim.models import Word2Vec
 from networkx import Graph
@@ -10,8 +9,7 @@ from scipy.spatial.distance import cdist
 from sklearn.cluster import KMeans
 
 
-# https://github.com/eliorc/node2vec
-def _embed_nodes(
+def embed_nodes(
     graph: Graph,
     dimensions: int = 32,
     walk_length: int = 20,
@@ -23,8 +21,11 @@ def _embed_nodes(
     """Embed nodes in a graph using node2vec.
 
     Args:
-        TODO: to add args description
-
+        graph: A networkx Graph object.
+        dimensions: The embedding dimension. 
+        walk_length, num_walks, workers: Parameters for node2vec.
+        window, min_count: Parameters for fitting the node2vec model.
+        
     Returns:
         np.ndarray: embedding matrix of shape `(num_nodes, dimensions)`.
     """
@@ -43,21 +44,28 @@ def _embed_nodes(
     return model.wv.vectors, model
 
 
-def _get_equal_sized_clusters(
+def get_equal_sized_clusters(
     X: np.ndarray, 
     model: Word2Vec,
     graph: Graph, 
     cluster_size: int,
     key_to_index: Optional[Dict[Any, int]] = None,
 ) -> Dict[Any, int]:
-    """ 
+    """Get clusters of equal size for a graph.
+    
     Running KMeans then finding the minimal matching of points to clusters 
-    under the constraint of maximal points assigned to cluster (cluster size)
+    under the constraint of maximal points assigned to cluster.
+    
     Args:
-        X: numpy array, num_samples x num_features?
-        cluster_size: cluster size
+        X: A `num_samples x num_features`-shaped numpy array of node embeddings.
+        model: A `Word2Vec` model.
+        graph: A networkx Graph object representing the social network.
+        cluster_size: The size of each cluster. 
+        key_to_index: An optional dictionary mapping node to index in the 
+            embedding matrix.
         
-    Returns
+    Returns:
+        A dictionary mapping node to cluster id.
     """
     n_clusters = int(np.ceil(len(X) / cluster_size))
     kmeans = KMeans(n_clusters)
