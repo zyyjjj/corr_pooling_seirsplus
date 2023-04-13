@@ -1,11 +1,10 @@
 # sim loop for tti sim with pooled tests
 from __future__ import division
 from typing import Optional
-
-import pickle
-import time
 import random
-
+import time
+import pickle
+from networkx import Graph
 import numpy as np
 
 from pooled_test import OneStageGroupTesting
@@ -140,6 +139,7 @@ class SimulationRunner:
 
         # TODO: save diagnostics in self.results
         # TODO: save self.results to self.output_path
+        
 
 
     def run_simulation(self):
