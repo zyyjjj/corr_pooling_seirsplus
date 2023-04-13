@@ -45,7 +45,9 @@ class OneStageGroupTesting:
             seed: random seed used for one-stage group testing.
 
         Returns:
-            A list of list of booleans indicating the group testing results.
+            A two-element tuple containing:
+            - A list of list of booleans indicating the group testing results.
+            - A dictionary storing the sensitivity and test consumption.
         """
         res = []
         np.random.seed(seed)
