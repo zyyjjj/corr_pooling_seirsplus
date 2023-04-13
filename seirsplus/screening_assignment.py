@@ -83,7 +83,11 @@ def get_equal_sized_clusters(
     return clusters
 
 
-
+def generate_screening_assignment(
+    graph: Graph, 
+    num_testing_groups: int,
+):
+    pass
 # def prepare_for_pooled_test(
 #     ids
 #     assignment,

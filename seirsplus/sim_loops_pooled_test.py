@@ -27,8 +27,8 @@ class SimulationRunner:
         r"""Initialize the simulation runner. 
         
         Args:
-            model: a `ViralExtSEIRNetworkModel` 
-            T: duration (days) of the simulation
+            model: A `ViralExtSEIRNetworkModel` object.
+            T: Duration (in days) of the simulation.
             screening_assignment: dictionary that specifies, for each screening group,
                 the days in the cadence cyle on which the group is screened,
                 and the IDs of the individuals in the group. For example,
@@ -38,9 +38,9 @@ class SimulationRunner:
                         1: ([1,8,15,22], [5,6,7,8,9]), ...
                         6: ([6,13,20,27], [30,31,32,33,34])
                     }
-            seed: random seed
-            max_dt: seemingly useless model parameter that I prefer not to touch
-            cadence_cycle: default 4 weeks
+            seed: The random seed for the simulation. 
+            max_dt: seemingly useless model parameter that I prefer not to touch # TODO: update this
+            cadence_cycle: default 4 weeks # TODO
             
         Returns: 
             None.
