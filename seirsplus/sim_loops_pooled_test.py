@@ -13,7 +13,7 @@ from viral_model import ViralExtSEIRNetworkModel
 
 
 class SimulationRunner:
-
+    """Runner class for SEIRS+ simulation with pooled testing."""
     def __init__(
         self,
         model: ViralExtSEIRNetworkModel, 
@@ -24,7 +24,8 @@ class SimulationRunner:
         cadence_cycle_length: int = 28, 
         output_path: str = None,
     ):
-        r"""
+        r"""Initialize the simulation runner. 
+        
         Args:
             model: a `ViralExtSEIRNetworkModel` 
             T: duration (days) of the simulation
@@ -40,6 +41,9 @@ class SimulationRunner:
             seed: random seed
             max_dt: seemingly useless model parameter that I prefer not to touch
             cadence_cycle: default 4 weeks
+            
+        Returns: 
+            None.
         """
 
         self.model = model
