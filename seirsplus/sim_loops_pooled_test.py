@@ -1,67 +1,87 @@
 # sim loop for tti sim with pooled tests
 from __future__ import division
-from typing import Dict, Tuple, List
+from typing import Optional
 
 import pickle
 import time
+import random
 
-import numpy
+import numpy as np
+
 from pooled_test import OneStageGroupTesting
 from viral_model import ViralExtSEIRNetworkModel
-
-# from screening_assignment import assign # TODO: in progress, add when finished
-
+from assignment import embed_nodes, get_equal_sized_clusters
 
 class SimulationRunner:
     """Runner class for SEIRS+ simulation with pooled testing."""
     def __init__(
         self,
         model: ViralExtSEIRNetworkModel, 
-        T: int, 
-        screening_assignment: Dict[Tuple[List]],  # TODO: Jiayue to provide this
+        T: int,
+        num_groups: int,
+        pool_size: int,
         seed: int,
-        max_dt: int = None,
-        cadence_cycle_length: int = 28, 
-        output_path: str = None,
+        max_dt: Optional[int] = None,
+        output_path: Optional[str] = None,
     ):
         r"""Initialize the simulation runner. 
         
         Args:
             model: A `ViralExtSEIRNetworkModel` object.
             T: Duration (in days) of the simulation.
-            screening_assignment: dictionary that specifies, for each screening group,
-                the days in the cadence cyle on which the group is screened,
-                and the IDs of the individuals in the group. For example,
-                an assignment splitting 35 people evenly across 7 groups may look like
-                    {
-                        0: ([0,7,14,21], [0,1,2,3,4]),
-                        1: ([1,8,15,22], [5,6,7,8,9]), ...
-                        6: ([6,13,20,27], [30,31,32,33,34])
-                    }
+            num_groups: Number of testing groups to split the population into.
+            pool_size: Size of the pooled tests in one-stage group testing.
             seed: The random seed for the simulation. 
             max_dt: seemingly useless model parameter that I prefer not to touch # TODO: update this
-            cadence_cycle: default 4 weeks # TODO
+            output_path: The directory to save the simulation results to.
             
         Returns: 
             None.
         """
-
+        # set manual seed
+        self.seed = seed
+        np.random.seed(self.seed)
+        random.seed(self.seed)
+        
+        # simulation setup
         self.model = model
         self.T = T
-        self.screening_assignment = screening_assignment
-        self.seed = seed
+        self.num_groups = num_groups
+        self.pool_size = pool_size
+        self.screening_groups = self.get_groups(
+            graph=self.model.G,
+            cluster_size=self.num_groups
+        )
         self.max_dt = max_dt
-        self.cadence_cycle_length = cadence_cycle_length
         self.output_path = output_path
 
-        self.day_to_screening_group = {}
-        for group_id, screening_info in screening_assignment: 
-            for day in screening_info[0]: 
-                self.day_to_screening_group[day] = group_id
-
-        self.isolation_states = [model.Q_S, model.Q_E, model.Q_pre, model.Q_sym, model.Q_asym, model.Q_R]
-
+        self.isolation_states = [
+            model.Q_S, 
+            model.Q_E, 
+            model.Q_pre, 
+            model.Q_sym, 
+            model.Q_asym, 
+            model.Q_R
+        ]
+        
+        # initialize results
         self.results = {} # TODO
+
+
+    def get_groups(self, graph: Graph, cluster_size: int):
+        """Get the screening groups for the simulation."""
+        embedding, node2vec_model = embed_nodes(graph)
+        clusters = get_equal_sized_clusters(
+            X=embedding, 
+            model=node2vec_model,
+            graph=graph,
+            cluster_size=cluster_size,
+        )  # dict of node_id to cluster id
+        groups = {
+            i: [x for x,v in clusters.items() if v == i] 
+            for i in range(cluster_size)
+        }  # dict of cluster ids as the keys and the node ids as the values
+        return groups
 
 
     def run_screening_one_day(self, screening_group_id: int):
@@ -84,19 +104,29 @@ class SimulationRunner:
         nodeStates = self.model.X.flatten()
 
         # test those in the screening_group and *not isolated*
-        screening_group = self.screening_assignment[screening_group_id][1] # list of IDs
-        for test_subject in screening_group:
-            if nodeStates[test_subject] in self.isolation_states:
-                screening_group.remove(test_subject)
+        screening_group = self.screening_assignment[screening_group_id] # list of IDs
+        screening_group = [
+            x for x in screening_group 
+            if nodeStates[x] not in self.isolation_states
+        ]
             
-        self.model.update_VL(nodes_to_exclude = [self.transitionNode]) # TODO: to implement; update VL for everyone except self.model.transitionNode
-        self.model.update_beta_given_VL(n) # TODO: to implement
+        self.model.update_VL(nodes_to_exclude=[self.transitionNode]) # TODO: to implement; update VL for everyone except self.model.transitionNode
+        self.model.update_beta_given_VL(nodes_to_exclude=[self.transitionNode]) # TODO: to implement
 
         # TODO: assign screening_group to individual pools, 
+        
         # return a nested list called `screening_group_pools`
         # also fetch the viral loads and put in nested list `screening_group_VL`
         # individual_pools = assign(screening_group, self.model.VL)
-
+        pools = self.get_pools(
+            graph=self.model.G(screening_group), 
+            cluster_size=self.pool_size
+        )
+        pools = [v for k,v in pools.items()] # a list of lists
+        viral_loads = [[self.model.VL[x] for x in pool] for pool in pools]
+        group_testing = OneStageGroupTesting(ids=pools, viral_loads=viral_loads)
+        test_results, diagnostics = group_testing.run_one_stage_group_testing(seed=self.seed)
+        
         # TODO: then call group_testing
         # group_testing = OneStageGroupTesting(ids = screening_group_pools, viral_loads = screening_group_VL)
         # test_results, diagnostics = group_testing.run_one_stage_group_testing(seed=self.seed)
