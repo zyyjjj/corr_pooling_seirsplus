@@ -75,6 +75,8 @@ def get_equal_sized_clusters(
     
     distance_matrix = cdist(X, centers)
     clusters = linear_sum_assignment(distance_matrix)[1]//cluster_size
+    clusters = [int(x) for x in clusters]
+    
     if key_to_index is None:
         clusters = {i: clusters[model.wv.key_to_index[i]] for i in graph.nodes()}
     else:
@@ -82,12 +84,6 @@ def get_equal_sized_clusters(
 
     return clusters
 
-
-def generate_screening_assignment(
-    graph: Graph, 
-    num_testing_groups: int,
-):
-    pass
 # def prepare_for_pooled_test(
 #     ids
 #     assignment,
