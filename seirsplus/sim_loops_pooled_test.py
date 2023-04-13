@@ -117,7 +117,7 @@ class SimulationRunner:
         # return a nested list called `screening_group_pools`
         # also fetch the viral loads and put in nested list `screening_group_VL`
         # individual_pools = assign(screening_group, self.model.VL)
-        pools = self.get_pools(
+        pools = self.get_groups(
             graph=self.model.G(screening_group), 
             cluster_size=self.pool_size
         )
