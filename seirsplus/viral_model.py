@@ -7,41 +7,52 @@ from typing import List
 # either way, look into literature (Cleary / Brault) to decide values
 INIT_VL_BY_STATE = {
     "S": 0,
-    "E": 0,
-    "I_pre": 0,
-    "I_sym": 0,
-    "I_asym": 0,
-    "H": 0,
-    "R": 0,
-    "F": 0,
+    "E": 3, # by Larremore et al. 2021
+    "I_pre": 6, # taking the average of E and I_sym/I_asym
+    "I_sym": 9, # to start with
+    "I_asym": 9, # to start with, though could consider increasing
+    "H": 6, # to start with, keep same as R, though could consider increasing
+    "R": 6, # by Larremore et al. 2021
+    "F": 0, # ?
     "Q_S": 0,
-    "Q_E": 0,
-    "Q_pre": 0,
-    "Q_sym": 0,
-    "Q_asym": 0,
-    "Q_R": 0
+    "Q_E": 3,
+    "Q_pre": 6,
+    "Q_sym": 9,
+    "Q_asym": 9,
+    "Q_R": 6
 }
+
+# what Larremore et la. 2021 says about viral load progression
+# (t_0, 3), where t_0 ~ Unif[2.5, 3.5]
+# (t_peak, V_peak), where t_peak - t_0 ~ 0.5 + Gamma(1.5), capped at 3; V_peak ~ Unif[7, 11]
+# (t_f, 6), where t_f - t_peak ~ Unif[4, 9]
+# t_symptoms − t_peak ∼ unif[0, 3] -- symptom onset happens after VL peaks
+# let's assume that VL is increasing in state I_pre and decreasing in states I_sym and I_asym
+
+
 
 # slope of log10 VL progression
 # key is transitionType, keep consistent with existing notation
 # TODO: later enable sampling from a distribution
 # NOTE: the slopes for state 'X' and state 'QX' can be assumed the same
 
+# these values are preliminary values, could consider improving later
+# TODO: also make sure to floor self.VL at 0; should I ceiling it at a max value?
 VL_SLOPES = { 
     "S": 0.,
-    "E": 0.1, # TODO
-    "I_pre": 0.1, # TODO
-    "I_sym": 0.1, # TODO
-    "I_asym": 0.1, # TODO
-    "H": 0.1, # TODO
-    "R": -0.1, # TODO
-    "F": 0, # TODO; is this still important?
+    "E": 1., 
+    "I_pre": 1., 
+    "I_sym": -1., # ?
+    "I_asym": -1., # ?
+    "H": -1.,
+    "R": -1., 
+    "F": 0, 
     "Q_S": 0., 
-    "Q_E": 0.1, # TODO
-    "Q_pre": 0.1, # TODO
-    "Q_sym": 0.1, # TODO
-    "Q_asym": 0.1, # TODO
-    "Q_R": -0.1 # TODO
+    "Q_E": 1., 
+    "Q_pre": 1., 
+    "Q_sym": -1., 
+    "Q_asym": -1., 
+    "Q_R": -1. 
 }
 # The slopes and the initial state values should be consistent in the way that 
 # initial VL at S1 + slope at S1 * (average time between S1 and S2) = initial VL at S2
@@ -106,7 +117,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             self.current_state_init_VL[node] = self.init_VL[state]
 
         # TODO: set beta according to viral load
-        self.update_beta_given_VL()
+        # self.update_beta_given_VL()
 
 
     def update_VL(
@@ -162,7 +173,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         for node in nodes_to_update:
             state = self.X[node]
-            self.current_VL[node] = self.current_state_init_VL[node] + self.VL_slopes[state] * self.timer_state[node]
+            new_VL_val = self.current_state_init_VL[node] + self.VL_slopes[state] * self.timer_state[node]
+            self.current_VL[node] = max(0, new_VL_val) # TODO: is this necessary? because it's log it's ok to have negatives? 
 
 
     def update_beta_given_VL(
@@ -171,7 +183,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         nodes_to_exclude: List = None
         ):
         """
-        Update the transmission rates given the current viral load.
+        Update the transmission rates (both self.beta and self.beta_Q) given the current viral load.
         The logic is TBD
 
         This function should be called every time after update_VL() is called
@@ -184,6 +196,14 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         """
 
         # TODO: think through what logic to use
+        # to start with, have beta proportional to log10 VL
+        
+        # the default method for initializing beta: R0 / infectiousPeriod, 
+        # where infectiousPeriod = presymptomatic period + symptomatic period
+
+        # do we have to include it?
+        # If we don't, the correlation in infection status is induced by network structure only
+        # If we do, the correlation is induced by network structure + prop-to-VL transmission intensity
 
         pass
 
@@ -263,7 +283,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             # TODO: check this
             self.current_VL[transitionNode] = self.init_VL[self.X[transitionNode]]
             self.current_state_init_VL[transitionNode] = self.current_VL[transitionNode]
-            self.update_beta_given_VL(nodes_to_include = [transitionNode])
+            # self.update_beta_given_VL(nodes_to_include = [transitionNode])
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
