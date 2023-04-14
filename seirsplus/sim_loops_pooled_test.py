@@ -16,6 +16,7 @@ class SimulationRunner:
     def __init__(
         self,
         model: ViralExtSEIRNetworkModel, 
+        pooling_strategy: str,
         T: int,
         num_groups: int,
         pool_size: int,
@@ -51,6 +52,9 @@ class SimulationRunner:
             graph=self.model.G,
             cluster_size=self.num_groups
         )
+        if pooling_strategy not in ['naive', 'correlated']:
+            raise NotImplementedError(f"Pooling strategy {pooling_strategy} not implemented.")
+        self.pooling_strategy = pooling_strategy
         self.max_dt = max_dt
         self.output_path = output_path
 
@@ -111,24 +115,25 @@ class SimulationRunner:
             
         self.model.update_VL(nodes_to_exclude=[self.transitionNode]) # TODO: to implement; update VL for everyone except self.model.transitionNode
         self.model.update_beta_given_VL(nodes_to_exclude=[self.transitionNode]) # TODO: to implement
-
-        # TODO: assign screening_group to individual pools, 
         
         # return a nested list called `screening_group_pools`
         # also fetch the viral loads and put in nested list `screening_group_VL`
         # individual_pools = assign(screening_group, self.model.VL)
-        pools = self.get_groups(
-            graph=self.model.G(screening_group), 
-            cluster_size=self.pool_size
-        )
-        pools = [v for k,v in pools.items()] # a list of lists
+        if self.pooling_strategy == 'correlated':
+            pools = self.get_groups(
+                graph=self.model.G(screening_group), 
+                cluster_size=self.pool_size
+            )
+            pools = [v for _, v in pools.items()] # a list of lists
+        elif self.pooling_strategy == 'naive':
+            random.shuffle(screening_group)
+            pools = [
+                screening_group[i: i + self.pool_size] 
+                for i in range(0, len(screening_group), self.pool_size)
+            ]
         viral_loads = [[self.model.VL[x] for x in pool] for pool in pools]
         group_testing = OneStageGroupTesting(ids=pools, viral_loads=viral_loads)
         test_results, diagnostics = group_testing.run_one_stage_group_testing(seed=self.seed)
-        
-        # TODO: then call group_testing
-        # group_testing = OneStageGroupTesting(ids = screening_group_pools, viral_loads = screening_group_VL)
-        # test_results, diagnostics = group_testing.run_one_stage_group_testing(seed=self.seed)
         
         # TODO: pass test_results to update isolation status in self.model
             # model.set_positive(node, True)
