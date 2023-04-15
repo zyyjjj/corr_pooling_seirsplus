@@ -1,70 +1,83 @@
-import numpy as np
-from models import ExtSEIRSNetworkModel
 from typing import List
+
+import numpy
+
+from seirsplus.models import ExtSEIRSNetworkModel
 
 # initial viral load by state
 # TODO: later enable sampling from a distribution
-# either way, look into literature (Cleary / Brault) to decide values
 INIT_VL_BY_STATE = {
-    "S": 0,
-    "E": 3, # by Larremore et al. 2021
-    "I_pre": 6, # taking the average of E and I_sym/I_asym
-    "I_sym": 9, # to start with
-    "I_asym": 9, # to start with, though could consider increasing
-    "H": 6, # to start with, keep same as R, though could consider increasing
-    "R": 6, # by Larremore et al. 2021
-    "F": 0, # ?
-    "Q_S": 0,
-    "Q_E": 3,
-    "Q_pre": 6,
-    "Q_sym": 9,
-    "Q_asym": 9,
-    "Q_R": 6
+    1: 0, # S
+    2: 3, # E, by Larremore et al. 2021
+    3: 6, # I_pre, taking the average of E and I_sym/I_asym
+    4: 9, # I_sym, to start with
+    5: 9, # I_asym, to start with, though could consider increasing
+    6: 6, # H, to start with, keep same as R, though could consider increasing
+    7: 6, # R, by Larremore et al. 2021
+    8: 0, # F, ?
+    11: 0, # Q_S
+    12: 3, # Q_E
+    13: 6, # Q_pre
+    14: 9, # Q_sym
+    15: 9, # Q_asym
+    17: 6 # Q_R
 }
+"""
+what Larremore et la. 2021 says about viral load progression
+(t_0, 3), where t_0 ~ Unif[2.5, 3.5]
+(t_peak, V_peak), where t_peak - t_0 ~ 0.5 + Gamma(1.5), capped at 3; V_peak ~ Unif[7, 11]
+(t_f, 6), where t_f - t_peak ~ Unif[4, 9]
+t_symptoms − t_peak ∼ unif[0, 3] -- symptom onset happens after VL peaks
+let's assume that VL is increasing in state I_pre and decreasing in states I_sym and I_asym
+"""
 
-# what Larremore et la. 2021 says about viral load progression
-# (t_0, 3), where t_0 ~ Unif[2.5, 3.5]
-# (t_peak, V_peak), where t_peak - t_0 ~ 0.5 + Gamma(1.5), capped at 3; V_peak ~ Unif[7, 11]
-# (t_f, 6), where t_f - t_peak ~ Unif[4, 9]
-# t_symptoms − t_peak ∼ unif[0, 3] -- symptom onset happens after VL peaks
-# let's assume that VL is increasing in state I_pre and decreasing in states I_sym and I_asym
-
-
-
-# slope of log10 VL progression
-# key is transitionType, keep consistent with existing notation
+# slope of log10 VL progression in different states
 # TODO: later enable sampling from a distribution
-# NOTE: the slopes for state 'X' and state 'QX' can be assumed the same
-
-# these values are preliminary values, could consider improving later
-# TODO: also make sure to floor self.VL at 0; should I ceiling it at a max value?
+# TODO: to discuss (1) floor at 0? (2) ceiling at some max value? (3) int() when passing into group testing?
 VL_SLOPES = { 
-    "S": 0.,
-    "E": 1., 
-    "I_pre": 1., 
-    "I_sym": -1., # ?
-    "I_asym": -1., # ?
-    "H": -1.,
-    "R": -1., 
-    "F": 0, 
-    "Q_S": 0., 
-    "Q_E": 1., 
-    "Q_pre": 1., 
-    "Q_sym": -1., 
-    "Q_asym": -1., 
-    "Q_R": -1. 
+    1: 0., # S
+    2: 1., # E
+    3: 1., # I_pre
+    4: -1., # I_sym, ?
+    5: -1., # I_asym?
+    6: -1., # H
+    7: -1., # R
+    8: 0, # F
+    11: 0., # Q_S
+    12: 1., # Q_E
+    13: 1., # Q_pre
+    14: -1., # Q_sym
+    15: -1., # Q_asym
+    17: -1. # Q_R
 }
-# The slopes and the initial state values should be consistent in the way that 
-# initial VL at S1 + slope at S1 * (average time between S1 and S2) = initial VL at S2
-# avg time between two states should be inverse of the transition rate
-# how did they set transition rate in the model?
-# TODO: later also implement max_vl to prevent someone's VL from growing infinitely big
+"""
+The slopes and the initial state values should be consistent in the way that roughly
+initial VL at S1 + slope at S1 * (average time between S1 and S2) = initial VL at S2
+avg time between two states should be inverse of the transition rate
+"""
 
 class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
-    # to add VL and time-varying transmissibility
-    # :
-    # 1. have a viral load array tracking every person's VL over time (cts or discrete?)
-    # 2. have beta (transmission rate) depend on VL
+    r"""
+    A class to simulate the extended SEIRS Stochastic Network Model, where
+    each node has a viral load that is dynamically updated as time progresses 
+    and they transition through different states. Viral loads are represented
+    as log-10 values.
+     
+    Additional params compared to ExtSEIRSNetworkModel:
+        init_VL: dict, initial log10 viral load in each state
+        VL_slopes: dict, slope of log10 viral load progression in each state
+    
+    Additional variables compared to ExtSEIRSNetworkModel:
+        self.current_VL: numpy array, 
+            tracks the current log10 viral load of each node
+        self.current_state_init_VL: numpy array, 
+            tracks the log10 viral load of each node at the start of the current state
+        self.transitionNode: int, tracks the node that is currently undergoing
+            transition. At daily screenings, our SimulationRunner computes the 
+            updated viral load of all nodes eligible to participate in testing. 
+            To avoid conflicting updates, we prevent the node currently undergoing 
+            transition from being updated by the SimulationRunner.
+    """
 
     def __init__(self, G, beta, sigma, lamda, gamma, 
                     init_VL = INIT_VL_BY_STATE, VL_slopes = VL_SLOPES,
@@ -77,33 +90,40 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                     initQ_S=0, initQ_E=0, initQ_pre=0, initQ_sym=0, initQ_asym=0, initQ_R=0,
                     o=0, prevalence_ext=0,
                     transition_mode='exponential_rates', node_groups=None, store_Xseries=False, seed=None):
-        r"""
-        Initialize the model class. 
-        How it's different from ExtSEIRNetworkModel: # TODO: add more documentation
-        """
 
-        super().__init__() 
-
+        super().__init__(G, beta, sigma, lamda, gamma, 
+                    gamma_asym=gamma_asym, eta=eta, gamma_H=gamma_H, mu_H=mu_H, alpha=alpha, xi=xi, mu_0=mu_0, nu=nu, a=a, h=h, f=f, p=p,             
+                    beta_local=beta_local, beta_asym=beta_asym, beta_asym_local=beta_asym_local, beta_pairwise_mode=beta_pairwise_mode, delta=delta, delta_pairwise_mode=delta_pairwise_mode,
+                    G_Q=G_Q, beta_Q=beta_Q, beta_Q_local=beta_Q_local, sigma_Q=sigma_Q, lamda_Q=lamda_Q, eta_Q=eta_Q, gamma_Q_sym=gamma_Q_sym, gamma_Q_asym=gamma_Q_asym, alpha_Q=alpha_Q, delta_Q=delta_Q,
+                    theta_S=theta_S, theta_E=theta_E, theta_pre=theta_pre, theta_sym=theta_sym, theta_asym=theta_asym, phi_S=phi_S, phi_E=phi_E, phi_pre=phi_pre, phi_sym=phi_sym, phi_asym=phi_asym,    
+                    psi_S=psi_S, psi_E=psi_E, psi_pre=psi_pre, psi_sym=psi_sym, psi_asym=psi_asym, q=q, isolation_time=isolation_time,
+                    initE=initE, initI_pre=initI_pre, initI_sym=initI_sym, initI_asym=initI_asym, initH=initH, initR=initR, initF=initF,        
+                    initQ_S=initQ_S, initQ_E=initQ_E, initQ_pre=initQ_pre, initQ_sym=initQ_sym, initQ_asym=initQ_asym, initQ_R=initQ_R,
+                    o=o, prevalence_ext=prevalence_ext,
+                    transition_mode=transition_mode, node_groups=node_groups, store_Xseries=store_Xseries, seed=seed)
+        
         # node currently undergoing a transition; "locked" and does not participate in screening
+        # TODO: come back to this when integrating into SimulationRunner
         self.transitionNode = None 
 
         self.init_VL = init_VL
         self.VL_slopes = VL_slopes
-        self.current_VL = np.zeros(self.numNodes)
+        self.current_VL = numpy.zeros(self.numNodes)
 
         # VL value at the beginning of the current state
-        self.current_state_init_VL = np.zeros(self.numNodes)
+        self.current_state_init_VL = numpy.zeros(self.numNodes)
 
-        self.initialize_VL_and_beta()
+        self.initialize_VL()
     
 
-    def initialize_VL_and_beta(self):
+    def initialize_VL(self):
         r"""
         Initialize the log10 viral load of each node at the start of the simulation.
         This function should be called in __init__().
 
         The rationale for keeping this separate from update_VL() is the following:
-        if someone starts from an infectious state whose previous state also should have positive viral load, 
+        if someone starts from an infectious state whose previous state also 
+            has positive viral load, 
             then the initialized all-0 self.current_state_init_VL doesn't make sense;
             instead we should generate a positive hypothetical last_state_log10_VL value
             e.g., we sample the initial VL from some distribution like Brault's GMM
@@ -113,11 +133,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         # for each node, get / sample initial viral load
         for node, state in enumerate(self.X):
-            self.current_VL[node] = self.init_VL[state]
-            self.current_state_init_VL[node] = self.init_VL[state]
-
-        # TODO: set beta according to viral load
-        # self.update_beta_given_VL()
+            self.current_VL[node] = self.init_VL[state[0]]
+            self.current_state_init_VL[node] = self.init_VL[state[0]]
 
 
     def update_VL(
@@ -130,15 +147,17 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         Update the log10 viral load of each node depending on their current state (self.X), 
         and the time they have been in their current state (self.timer_state)
 
-        This function should be called every time a state transition happens (model.run_one_iteration()),
-        and every time a screening takes place (run_tti_one_day()).
+        This function is called 
+        - every time a state transition happens (model.run_one_iteration()),
+        - and every time a screening takes place (run_tti_one_day()).
 
         The overall logic of updating the VL: 
-        - the VL at the end of last state defines a "baseline value"
+        - the VL at the start of the current state defines a "baseline value"
         - the current state maps to a slope of increase/decrease, either deterministic or sampled
             (in initial stages, should be increasing; if recovering, should be decreasing)
         - update goes like: new_VL = baseline_VL + slope * timer_state[i]
-        - if a state transition occurs, update self.current_state_init_VL (here? or in run_one_iteration?)
+        - this also works for new state transitions, since timer_state is reset to 0 
+            and the new viral load is set to the init viral load of the new state.
 
         Args:
             nodes_to_include: list of nodes to update VL for; 
@@ -146,66 +165,20 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 for both of them, if None, assume update VL for everyone 
         """
 
-        # Option 1:
-        # update VL and beta for everybody at every individual transition (not much added value)
-        # update VL for everybody (except self.transitionNode) on integer days
-
-        # Option 2:
-        # or we just update VL and beta for the perosn undergoing the transition
-        # and update VL for everybody (except self.transitionNode) on integer days
-
         # TODO: if the transition type is different, e.g., Isym to R or H
         # the slope could be different; we choose to ignore that for now
 
-        # 
-        # TODO: if this function is called for screening
-        # where a node's transition happens after screening but the state is already updated, how do we deal with that?
-        # one simple fix is to exclude this node from participating in screening at all
-        # like "lock" in multiprocessing
-        # to achieve this we need to save the self.transitionNode in run_iteration()
-
         if nodes_to_include is None:
             nodes_to_include = list(range(self.numNodes))
-        if nodes_to_exclude = None:
+        if nodes_to_exclude == None:
             nodes_to_exclude = []
         
         nodes_to_update = nodes_to_include - nodes_to_exclude # TODO: check
 
         for node in nodes_to_update:
-            state = self.X[node]
+            state = self.X[node][0]
             new_VL_val = self.current_state_init_VL[node] + self.VL_slopes[state] * self.timer_state[node]
-            self.current_VL[node] = max(0, new_VL_val) # TODO: is this necessary? because it's log it's ok to have negatives? 
-
-
-    def update_beta_given_VL(
-        self, 
-        nodes_to_include: List = None,
-        nodes_to_exclude: List = None
-        ):
-        """
-        Update the transmission rates (both self.beta and self.beta_Q) given the current viral load.
-        The logic is TBD
-
-        This function should be called every time after update_VL() is called
-        or maybe combine the two into one function
-
-        Args:
-            nodes_to_include: list of nodes to update VL for; 
-            nodes_to_exclude: list of nodes to not update VL for;
-                for both of them, if None, assume update VL for everyone 
-        """
-
-        # TODO: think through what logic to use
-        # to start with, have beta proportional to log10 VL
-        
-        # the default method for initializing beta: R0 / infectiousPeriod, 
-        # where infectiousPeriod = presymptomatic period + symptomatic period
-
-        # do we have to include it?
-        # If we don't, the correlation in infection status is induced by network structure only
-        # If we do, the correlation is induced by network structure + prop-to-VL transmission intensity
-
-        pass
+            self.current_VL[node] = max(0, new_VL_val) # TODO: seems necessary bc we want viral load > 1, i.e., log10 VL > 0?
 
 
     def run_iteration(self, max_dt=None):
@@ -280,10 +253,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             self.timer_state[transitionNode] = 0.0 # reset timer, since transitionNode is in a new state
 
             # directly update VL to the initial VL level of the new state
-            # TODO: check this
-            self.current_VL[transitionNode] = self.init_VL[self.X[transitionNode]]
+            self.current_VL[transitionNode] = self.init_VL[self.X[transitionNode][0]]
             self.current_state_init_VL[transitionNode] = self.current_VL[transitionNode]
-            # self.update_beta_given_VL(nodes_to_include = [transitionNode])
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
