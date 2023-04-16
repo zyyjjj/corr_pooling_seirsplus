@@ -21,7 +21,6 @@ class SimulationRunner:
         num_groups: int,
         pool_size: int,
         seed: int,
-        max_dt: Optional[int] = None,
         output_path: Optional[str] = None,
     ):
         r"""Initialize the simulation runner. 
@@ -32,7 +31,6 @@ class SimulationRunner:
             num_groups: Number of testing groups to split the population into.
             pool_size: Size of the pooled tests in one-stage group testing.
             seed: The random seed for the simulation. 
-            max_dt: seemingly useless model parameter that I prefer not to touch # TODO: update this
             output_path: The directory to save the simulation results to.
             
         Returns: 
@@ -55,7 +53,6 @@ class SimulationRunner:
         if pooling_strategy not in ['naive', 'correlated']:
             raise NotImplementedError(f"Pooling strategy {pooling_strategy} not implemented.")
         self.pooling_strategy = pooling_strategy
-        self.max_dt = max_dt
         self.output_path = output_path
 
         self.isolation_states = [
@@ -113,8 +110,9 @@ class SimulationRunner:
             if nodeStates[x] not in self.isolation_states
         ]
             
-        self.model.update_VL(nodes_to_exclude=[self.transitionNode]) # TODO: to implement; update VL for everyone except self.model.transitionNode
-        self.model.update_beta_given_VL(nodes_to_exclude=[self.transitionNode]) # TODO: to implement
+        # update VL for everyone except self.model.transitionNode, which is locked
+        self.model.update_VL(nodes_to_exclude=[self.transitionNode]) 
+        # self.model.update_beta_given_VL(nodes_to_exclude=[self.transitionNode]) # TODO: to implement
         
         # return a nested list called `screening_group_pools`
         # also fetch the viral loads and put in nested list `screening_group_VL`
@@ -159,8 +157,8 @@ class SimulationRunner:
         while running:
 
             # first run a model iteration, i.e., one transition
-            running = self.model.run_iteration(max_dt=self.max_dt) # NOTE: max_dt is None by default, in which case max_dt is set to model.tmax=T
-            
+            running = self.model.run_iteration()
+
             # make sure we don't skip any days due to the transition
             # implement testing on each day
             while dayOfLastIntervention <= int(self.model.t):
