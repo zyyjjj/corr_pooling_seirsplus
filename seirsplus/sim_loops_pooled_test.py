@@ -69,7 +69,12 @@ class SimulationRunner:
 
 
     def get_groups(self, graph: Graph, cluster_size: int):
-        """Get the screening groups for the simulation."""
+        """Get the screening groups for the simulation.
+        
+        Args:
+            graph: The networkx graph object.
+            cluster_size: The number of groups to split the population into. # TODO: YZ: is this right? 
+        """
         embedding, node2vec_model = embed_nodes(graph)
         clusters = get_equal_sized_clusters(
             X=embedding, 
@@ -79,7 +84,7 @@ class SimulationRunner:
         )  # dict of node_id to cluster id
         groups = {
             i: [x for x,v in clusters.items() if v == i] 
-            for i in range(cluster_size)
+            for i in range(cluster_size) # TODO: YZ: this should be n_clusters it seems
         }  # dict of cluster ids as the keys and the node ids as the values
         return groups
 
@@ -110,32 +115,33 @@ class SimulationRunner:
             if nodeStates[x] not in self.isolation_states
         ]
             
-        # update VL for everyone except self.model.transitionNode, which is locked
+        # update VL for everyone except self.model.transitionNode
         self.model.update_VL(nodes_to_exclude=[self.transitionNode]) 
-        # self.model.update_beta_given_VL(nodes_to_exclude=[self.transitionNode]) # TODO: to implement
         
-        # return a nested list called `screening_group_pools`
-        # also fetch the viral loads and put in nested list `screening_group_VL`
-        # individual_pools = assign(screening_group, self.model.VL)
+        # divide individuals in screening group into pools according to pooling strategy
+        # store pooling result and viral loads in nested lists
         if self.pooling_strategy == 'correlated':
             pools = self.get_groups(
                 graph=self.model.G(screening_group), 
                 cluster_size=self.pool_size
             )
-            pools = [v for _, v in pools.items()] # a list of lists
+            pools = [v for _, v in pools.items()] # a list of lists 
         elif self.pooling_strategy == 'naive':
             random.shuffle(screening_group)
             pools = [
                 screening_group[i: i + self.pool_size] 
                 for i in range(0, len(screening_group), self.pool_size)
             ]
-        viral_loads = [[self.model.VL[x] for x in pool] for pool in pools]
+        viral_loads = [[self.model.current_VL[x] for x in pool] for pool in pools]
         group_testing = OneStageGroupTesting(ids=pools, viral_loads=viral_loads)
         test_results, diagnostics = group_testing.run_one_stage_group_testing(seed=self.seed)
         
         # TODO: pass test_results to update isolation status in self.model
-            # model.set_positive(node, True)
-            # model.set_isolation(node, True)
+        for pool_idx, pool in enumerate(pools):
+            for individual_idx, individual in enumerate(pool):
+                if test_results[pool_idx][individual_idx] == 1:
+                    self.model.set_positive(individual, True)
+                    self.model.set_isolation(individual, True)
         
         # TODO: when we isolate someone through testing
         # make sure to change their state in model from X to QX
