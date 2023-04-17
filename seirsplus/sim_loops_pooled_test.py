@@ -48,7 +48,7 @@ class SimulationRunner:
         self.pool_size = pool_size
         self.screening_groups = self.get_groups(
             graph=self.model.G,
-            cluster_size=self.num_groups
+            cluster_size=self.num_groups # TODO: this is also not consistent -- use self.model.numNodes // self.num_groups + 1?
         )
         if pooling_strategy not in ['naive', 'correlated']:
             raise NotImplementedError(f"Pooling strategy {pooling_strategy} not implemented.")
@@ -69,11 +69,11 @@ class SimulationRunner:
 
 
     def get_groups(self, graph: Graph, cluster_size: int):
-        """Get the screening groups for the simulation.
+        """Get the screening groups or pools for the simulation.
         
         Args:
             graph: The networkx graph object.
-            cluster_size: The number of groups to split the population into. # TODO: YZ: is this right? 
+            cluster_size: The size of groups or pools to split the population into. 
         """
         embedding, node2vec_model = embed_nodes(graph)
         clusters = get_equal_sized_clusters(
@@ -82,9 +82,10 @@ class SimulationRunner:
             graph=graph,
             cluster_size=cluster_size,
         )  # dict of node_id to cluster id
+        cluster_ids = list(set(clusters.values())) # unique list of cluster ids
         groups = {
             i: [x for x,v in clusters.items() if v == i] 
-            for i in range(cluster_size) # TODO: YZ: this should be n_clusters it seems
+            for i in cluster_ids
         }  # dict of cluster ids as the keys and the node ids as the values
         return groups
 
