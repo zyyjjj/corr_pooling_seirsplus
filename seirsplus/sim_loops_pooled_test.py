@@ -144,10 +144,10 @@ class SimulationRunner:
                     self.model.set_positive(individual, True)
                     self.model.set_isolation(individual, True)
         
-        # TODO: when we isolate someone through testing
-        # make sure to change their state in model from X to QX
+                    # TODO: when we isolate someone through testing
+                    # make sure to change their state in model from X to QX
 
-        # TODO: save diagnostics in self.results
+        # TODO: save diagnostics in self.results, key is day, val is diagnostics dict
         # TODO: save self.results to self.output_path
         
 
