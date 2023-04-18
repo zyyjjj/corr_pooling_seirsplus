@@ -138,7 +138,7 @@ class SimulationRunner:
             ]
         viral_loads = [[self.model.current_VL[x] for x in pool] for pool in pools]
         group_testing = OneStageGroupTesting(ids=pools, viral_loads=viral_loads)
-        test_results, diagnostics = group_testing.run_one_stage_group_testing(seed=self.seed)
+        test_results, diagnostics = group_testing.run_one_stage_group_testing()
         
         # TODO: pass test_results to update isolation status in self.model
         for pool_idx, pool in enumerate(pools):

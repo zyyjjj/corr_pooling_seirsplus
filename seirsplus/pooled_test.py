@@ -38,7 +38,7 @@ class OneStageGroupTesting:
         self.pcr_params = pcr_params
         self.pool_size = len(ids[0])
 
-    def run_one_stage_group_testing(self, seed: int = 0):
+    def run_one_stage_group_testing(self, seed: Optional[int] = None):
         """Run one-stage hierarchical group testing.
 
         Args:
@@ -50,7 +50,8 @@ class OneStageGroupTesting:
             - A dictionary storing the sensitivity and test consumption.
         """
         res = []
-        np.random.seed(seed)
+        if seed is not None:
+            np.random.seed(seed)
         num_tests = len(self.viral_loads)
 
         # sensitivity, test consumption
