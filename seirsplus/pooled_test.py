@@ -20,7 +20,7 @@ class OneStageGroupTesting:
     def __init__(
         self,
         ids: List[List[int]],
-        viral_loads: List[List[Union[int, float]]],
+        viral_loads: List[List[int]],
         pcr_params: Optional[Dict[str, Union[float, int]]] = PCR_PARAMS,
     ) -> None:
         """Initialize a OneStageGroupTesting object.
