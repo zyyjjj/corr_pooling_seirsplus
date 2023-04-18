@@ -1,12 +1,15 @@
 # sim loop for tti sim with pooled tests
 from __future__ import division
-from typing import Optional
+
+from typing import Optional, Any, Dict
+
+import math
+import pickle
 import random
 import time
-import pickle
+
 from networkx import Graph
 import numpy as np
-
 from pooled_test import OneStageGroupTesting
 from viral_model import ViralExtSEIRNetworkModel
 from assignment import embed_nodes, get_equal_sized_clusters
@@ -48,7 +51,7 @@ class SimulationRunner:
         self.pool_size = pool_size
         self.screening_groups = self.get_groups(
             graph=self.model.G,
-            cluster_size=self.num_groups # TODO: this is also not consistent -- use self.model.numNodes // self.num_groups + 1?
+            cluster_size=math.ceil(self.model.numNodes / self.num_groups)
         )
         if pooling_strategy not in ['naive', 'correlated']:
             raise NotImplementedError(f"Pooling strategy {pooling_strategy} not implemented.")
@@ -68,12 +71,12 @@ class SimulationRunner:
         self.results = {} # TODO
 
 
-    def get_groups(self, graph: Graph, cluster_size: int):
+    def get_groups(self, graph: Graph, cluster_size: int) -> dict[int, Any]:
         """Get the screening groups or pools for the simulation.
         
         Args:
             graph: The networkx graph object.
-            cluster_size: The size of groups or pools to split the population into. 
+            cluster_size: The size of groups or pools into which we split the population.
         """
         embedding, node2vec_model = embed_nodes(graph)
         clusters = get_equal_sized_clusters(
