@@ -57,6 +57,7 @@ class SimulationRunner:
             raise NotImplementedError(f"Pooling strategy {pooling_strategy} not implemented.")
         self.pooling_strategy = pooling_strategy
         self.output_path = output_path
+        os.makedirs(self.output_path, exist_ok=True)
 
         self.isolation_states = [
             model.Q_S, 
@@ -68,7 +69,7 @@ class SimulationRunner:
         ]
         
         # initialize results
-        self.results = {} # TODO
+        self.results = []
 
 
     def get_groups(self, graph: Graph, cluster_size: int) -> dict[int, Any]:
@@ -150,8 +151,12 @@ class SimulationRunner:
                     # TODO: when we isolate someone through testing
                     # make sure to change their state in model from X to QX
 
-        # TODO: save diagnostics in self.results, key is day, val is diagnostics dict
-        # TODO: save self.results to self.output_path
+        self.results.append(diagnostics)
+
+        with open(os.path.join(self.output_path, 'results.pickle'), 'wb') as f:
+            pickle.dump(self.results, f)
+
+
         
 
 
@@ -160,25 +165,27 @@ class SimulationRunner:
         Run screening for the full duration self.T.
         """
 
-        dayOfLastIntervention = 0
+        dayOfNextIntervention = 0
         self.model.tmax  = self.T
-        running = True
+
+        # if time % 10 == 0, save snapshot of current viral loads
         
-        while running:
+        while True:
 
             # first run a model iteration, i.e., one transition
             running = self.model.run_iteration()
 
+            if running == False:
+                break
+
             # make sure we don't skip any days due to the transition
-            # implement testing on each day
-            while dayOfLastIntervention <= int(self.model.t):
-                cadenceDayNumber = int(dayOfLastIntervention % self.cadence_cycle_length)
+            # implement testing at the start of each day, on 0, 1, ..., T-1, 
+            while dayOfNextIntervention <= int(self.model.t):
+                cadenceDayNumber = int(dayOfNextIntervention % self.cadence_cycle_length)
                 screening_group_id = self.day_to_screening_group[cadenceDayNumber]
                 self.run_screening_one_day(screening_group_id)
-                dayOfLastIntervention += 1
+                dayOfNextIntervention += 1
             
-            if dayOfLastIntervention > self.T:
-                running = False
 
 
 # sketch of overall loop
