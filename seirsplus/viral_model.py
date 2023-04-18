@@ -7,7 +7,7 @@ from seirsplus.models import ExtSEIRSNetworkModel
 # initial viral load by state
 # TODO: later enable sampling from a distribution
 INIT_VL_BY_STATE = {
-    1: 0, # S
+    1: -1, # S
     2: 3, # E, by Larremore et al. 2021
     3: 6, # I_pre, taking the average of E and I_sym/I_asym
     4: 9, # I_sym, to start with
@@ -31,7 +31,7 @@ t_symptoms − t_peak ∼ unif[0, 3] -- symptom onset happens after VL peaks
 let's assume that VL is increasing in state I_pre and decreasing in states I_sym and I_asym
 """
 
-# slope of log10 VL progression in different states
+# slope of log10 VL progression in different states -- TODO: think how to represent 0 viral load? use -1
 # TODO: later enable sampling from a distribution
 # TODO: to discuss (1) floor at 0? (2) ceiling at some max value? (3) int() when passing into group testing?
 VL_SLOPES = { 
@@ -68,7 +68,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         VL_slopes: dict, slope of log10 viral load progression in each state
     
     Additional variables compared to ExtSEIRSNetworkModel:
-        self.current_VL: numpy array, 
+        self.current_VL: numpy array of size self.numNodes,
             tracks the current log10 viral load of each node
         self.current_state_init_VL: numpy array, 
             tracks the log10 viral load of each node at the start of the current state
@@ -108,7 +108,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         self.init_VL = init_VL
         self.VL_slopes = VL_slopes
-        self.current_VL = numpy.zeros(self.numNodes)
+        self.current_VL = numpy.zeros(self.numNodes) # TODO: should all be -1
 
         # VL value at the beginning of the current state
         self.current_state_init_VL = numpy.zeros(self.numNodes)
@@ -173,12 +173,12 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         if nodes_to_exclude == None:
             nodes_to_exclude = []
         
-        nodes_to_update = nodes_to_include - nodes_to_exclude # TODO: check
+        nodes_to_update = list(set(nodes_to_include)- set(nodes_to_exclude))
 
         for node in nodes_to_update:
             state = self.X[node][0]
             new_VL_val = self.current_state_init_VL[node] + self.VL_slopes[state] * self.timer_state[node]
-            self.current_VL[node] = max(0, new_VL_val) # TODO: seems necessary bc we want viral load > 1, i.e., log10 VL > 0?
+            self.current_VL[node] = max(-1, new_VL_val) 
 
 
     def run_iteration(self, max_dt=None):
