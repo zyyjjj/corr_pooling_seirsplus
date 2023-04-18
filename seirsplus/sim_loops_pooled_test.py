@@ -7,12 +7,13 @@ import math
 import pickle
 import random
 import time
+import os
 
 from networkx import Graph
 import numpy as np
-from pooled_test import OneStageGroupTesting
-from viral_model import ViralExtSEIRNetworkModel
-from assignment import embed_nodes, get_equal_sized_clusters
+from seirsplus.pooled_test import OneStageGroupTesting
+from seirsplus.viral_model import ViralExtSEIRNetworkModel
+from seirsplus.assignment import embed_nodes, get_equal_sized_clusters
 
 class SimulationRunner:
     """Runner class for SEIRS+ simulation with pooled testing."""
@@ -114,20 +115,20 @@ class SimulationRunner:
         nodeStates = self.model.X.flatten()
 
         # test those in the screening_group and *not isolated*
-        screening_group = self.screening_assignment[screening_group_id] # list of IDs
+        screening_group = self.screening_groups[screening_group_id] # list of IDs
         screening_group = [
             x for x in screening_group 
             if nodeStates[x] not in self.isolation_states
         ]
             
         # update VL for everyone except self.model.transitionNode
-        self.model.update_VL(nodes_to_exclude=[self.transitionNode]) 
+        self.model.update_VL(nodes_to_exclude=[self.model.transitionNode]) 
         
         # divide individuals in screening group into pools according to pooling strategy
         # store pooling result and viral loads in nested lists
         if self.pooling_strategy == 'correlated':
             pools = self.get_groups(
-                graph=self.model.G(screening_group), 
+                graph=self.model.G.subgraph(screening_group), 
                 cluster_size=self.pool_size
             )
             pools = [v for _, v in pools.items()] # a list of lists 
@@ -137,7 +138,10 @@ class SimulationRunner:
                 screening_group[i: i + self.pool_size] 
                 for i in range(0, len(screening_group), self.pool_size)
             ]
-        viral_loads = [[self.model.current_VL[x] for x in pool] for pool in pools]
+        viral_loads = [
+            [int(10 ** self.model.current_VL[x]) for x in pool]
+            for pool in pools
+        ]
         group_testing = OneStageGroupTesting(ids=pools, viral_loads=viral_loads)
         test_results, diagnostics = group_testing.run_one_stage_group_testing()
         
@@ -153,7 +157,7 @@ class SimulationRunner:
 
         self.results.append(diagnostics)
 
-        with open(os.path.join(self.output_path, 'results.pickle'), 'wb') as f:
+        with open(os.path.join(self.output_path, f'results_{self.seed}.pickle'), 'wb') as f:
             pickle.dump(self.results, f)
 
 
@@ -181,9 +185,8 @@ class SimulationRunner:
             # make sure we don't skip any days due to the transition
             # implement testing at the start of each day, on 0, 1, ..., T-1, 
             while dayOfNextIntervention <= int(self.model.t):
-                cadenceDayNumber = int(dayOfNextIntervention % self.cadence_cycle_length)
-                screening_group_id = self.day_to_screening_group[cadenceDayNumber]
-                self.run_screening_one_day(screening_group_id)
+                group_id = dayOfNextIntervention % self.num_groups
+                self.run_screening_one_day(group_id)
                 dayOfNextIntervention += 1
             
 
@@ -191,7 +194,7 @@ class SimulationRunner:
 # sketch of overall loop
 # this will be in a separate .py file I think
 
-def run_full_loop(T):
+# def run_full_loop(T):
 
     # create model class
 

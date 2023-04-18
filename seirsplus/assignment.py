@@ -76,11 +76,11 @@ def get_equal_sized_clusters(
     distance_matrix = cdist(X, centers)
     clusters = linear_sum_assignment(distance_matrix)[1]//cluster_size
     clusters = [int(x) for x in clusters]
-    
+    # print(model.wv.key_to_index)
     if key_to_index is None:
-        clusters = {i: clusters[model.wv.key_to_index[i]] for i in graph.nodes()}
+        clusters = {i: clusters[model.wv.key_to_index[str(i)]] for i in graph.nodes()}
     else:
-        clusters = {i: clusters[key_to_index[i]] for i in graph.nodes()}
+        clusters = {i: clusters[key_to_index[str(i)]] for i in graph.nodes()}
 
     return clusters
 

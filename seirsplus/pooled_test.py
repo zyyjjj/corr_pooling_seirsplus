@@ -68,8 +68,16 @@ class OneStageGroupTesting:
 
         num_positives = sum([sum([v > 0 for v in vl]) for vl in self.viral_loads])
         num_identified = sum([sum(pool_res) for pool_res in res])
-        sensitivity = num_identified / num_positives
-        return res, {"sensitivity": sensitivity, "num_tests": num_tests}
+        if num_positives:
+            sensitivity = num_identified / num_positives
+        else:
+            sensitivity = float('nan')
+        return res, {
+            "sensitivity": sensitivity,
+            "num_tests": num_tests,
+            "num_positives": num_positives,
+            "num_identified": num_identified,
+        }
 
 
 def run_one_PCR_test(
