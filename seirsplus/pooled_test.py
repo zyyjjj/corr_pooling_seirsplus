@@ -113,7 +113,7 @@ def run_one_PCR_test(
     pool_size = len(mu)
     # copies of RNA in a subsample that is c_1 of the original volume
     N_subsamples = np.random.binomial(
-        V_sample * np.array(mu, dtype=int), c_1 / pool_size
+        V_sample * np.array(mu).astype(int), c_1 / pool_size
     )
     N_pre_extraction = np.sum(N_subsamples)
     # copies of extracted RNA in the PCR template

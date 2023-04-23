@@ -161,9 +161,6 @@ class SimulationRunner:
             pickle.dump(self.results, f)
 
 
-        
-
-
     def run_simulation(self):
         r"""
         Run screening for the full duration self.T.
@@ -188,7 +185,39 @@ class SimulationRunner:
                 group_id = dayOfNextIntervention % self.num_groups
                 self.run_screening_one_day(group_id)
                 dayOfNextIntervention += 1
-            
+    
+    # YZ: feel free to rename or change return type
+    def get_performance(self):
+        r""" 
+        Compute the sensitivity and test consumption of a testing strategy over time.
+        
+        self.results is a list of dicts where each dict contains results of 
+        group testing conducted on one screening group on one day. 
+        Keys are 'sensitivity', 'num_tests, 'num_positives', 'num_identified'.
+
+        Returns:
+            cum_num_positives: cumulative number of positive individuals in the tests so far
+            cum_num_identified: cumulative number of positive individuals identified in the tests so far
+            cum_sensitivity: cumulative sensitivity of the tests (cum_num_identified / cum_num_positives)
+            cum_num_tests: cumulative number of PCR tests consumed so far
+        """
+
+        cum_num_positives = sum(
+            [result['num_positives'] for result in self.results]
+        )
+
+        cum_num_identified = sum(
+            [result['num_identified'] for result in self.results]
+        )
+
+        if cum_num_positives > 0:
+            cum_sensitivity = cum_num_identified / cum_num_positives
+        else:
+            cum_sensitivity = float('nan')
+
+        cum_num_tests = sum([result['num_tests'] for result in self.results])
+
+        return cum_num_positives, cum_num_identified, cum_sensitivity, cum_num_tests
 
 
 # sketch of overall loop
