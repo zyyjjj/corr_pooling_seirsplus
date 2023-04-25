@@ -4,7 +4,7 @@ import numpy
 
 from seirsplus.models import ExtSEIRSNetworkModel
 
-# initial viral load by state
+# initial log10 viral load by state
 # TODO: later enable sampling from a distribution
 INIT_VL_BY_STATE = {
     1: -1, # S
@@ -14,7 +14,7 @@ INIT_VL_BY_STATE = {
     5: 9, # I_asym, to start with, though could consider increasing
     6: 6, # H, to start with, keep same as R, though could consider increasing
     7: 6, # R, by Larremore et al. 2021
-    8: 0, # F, ?
+    8: -1, # F, ?
     11: 0, # Q_S
     12: 3, # Q_E
     13: 6, # Q_pre
@@ -108,10 +108,10 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         self.init_VL = init_VL
         self.VL_slopes = VL_slopes
-        self.current_VL = numpy.zeros(self.numNodes) # TODO: should all be -1
+        self.current_VL = -numpy.ones(self.numNodes) # TODO: should all be -1
 
         # VL value at the beginning of the current state
-        self.current_state_init_VL = numpy.zeros(self.numNodes)
+        self.current_state_init_VL = -numpy.ones(self.numNodes)
 
         self.initialize_VL()
     
