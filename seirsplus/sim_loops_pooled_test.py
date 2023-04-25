@@ -40,7 +40,7 @@ class SimulationRunner:
             seed: The random seed for the simulation.
             save_results: Whether to save the simulation results, default True.
             output_path: The directory to save the simulation results to.
-            
+
         Returns:
             None.
         """
@@ -104,7 +104,9 @@ class SimulationRunner:
         }  # dict of cluster ids as the keys and the node ids as the values
         return groups
 
-    def run_screening_one_day(self, screening_group_id: int, dayOfNextIntervention: int):
+    def run_screening_one_day(
+        self, screening_group_id: int, dayOfNextIntervention: int
+    ):
         """
         Test non-isolated individuals in one screening_group on one day.
 
@@ -161,9 +163,13 @@ class SimulationRunner:
 
         self.daily_results.append(diagnostics)
 
-        performance = self.get_cumulative_test_performance() # cumulative test performance
+        performance = (
+            self.get_cumulative_test_performance()
+        )  # cumulative test performance
         performance["day"] = dayOfNextIntervention
-        performance["cumRecovered"] = self.model.total_num_recovered() # this is an np array # TODO: revisit
+        performance[
+            "cumRecovered"
+        ] = self.model.total_num_recovered()  # this is an np array # TODO: revisit
 
         self.overall_results.append(performance)
 
@@ -212,9 +218,13 @@ class SimulationRunner:
             cum_num_tests: cumulative number of PCR tests consumed so far
         """
 
-        cum_num_positives = sum([result["num_positives"] for result in self.daily_results])
+        cum_num_positives = sum(
+            [result["num_positives"] for result in self.daily_results]
+        )
 
-        cum_num_identified = sum([result["num_identified"] for result in self.daily_results])
+        cum_num_identified = sum(
+            [result["num_identified"] for result in self.daily_results]
+        )
 
         if cum_num_positives > 0:
             cum_sensitivity = cum_num_identified / cum_num_positives
@@ -223,7 +233,9 @@ class SimulationRunner:
 
         cum_num_tests = sum([result["num_tests"] for result in self.daily_results])
 
-        return {"cum_num_positives": cum_num_positives,
-                "cum_num_identified": cum_num_identified,
-                "cum_sensitivity": cum_sensitivity,
-                "cum_num_tests": cum_num_tests,}
+        return {
+            "cum_num_positives": cum_num_positives,
+            "cum_num_identified": cum_num_identified,
+            "cum_sensitivity": cum_sensitivity,
+            "cum_num_tests": cum_num_tests,
+        }
