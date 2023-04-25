@@ -27,6 +27,7 @@ class SimulationRunner:
         num_groups: int,
         pool_size: int,
         seed: int,
+        save_results: bool = True,
         output_path: Optional[str] = None,
     ):
         r"""Initialize the simulation runner.
@@ -37,8 +38,9 @@ class SimulationRunner:
             num_groups: Number of testing groups to split the population into.
             pool_size: Size of the pooled tests in one-stage group testing.
             seed: The random seed for the simulation.
+            save_results: Whether to save the simulation results, default True.
             output_path: The directory to save the simulation results to.
-
+            
         Returns:
             None.
         """
@@ -61,8 +63,12 @@ class SimulationRunner:
                 f"Pooling strategy {pooling_strategy} not implemented."
             )
         self.pooling_strategy = pooling_strategy
+        self.save_results = save_results
         self.output_path = output_path
-        os.makedirs(self.output_path, exist_ok=True)
+        if self.save_results:
+            if self.output_path is None:
+                raise ValueError("Please specify an output path to save the results.")
+            os.makedirs(self.output_path, exist_ok=True)
 
         self.isolation_states = [
             model.Q_S,
@@ -73,8 +79,10 @@ class SimulationRunner:
             model.Q_R,
         ]
 
-        # initialize results
-        self.results = []
+        # list of dicts where each dict logs the diagnostics for one day of screening
+        self.daily_results = []
+        # list of dicts where each dict logs the day, the total number recovered, and the cumulative test performance so far
+        self.overall_results = []
 
     def get_groups(self, graph: Graph, cluster_size: int) -> dict[int, Any]:
         """Get the screening groups or pools for the simulation.
@@ -96,9 +104,9 @@ class SimulationRunner:
         }  # dict of cluster ids as the keys and the node ids as the values
         return groups
 
-    def run_screening_one_day(self, screening_group_id: int):
+    def run_screening_one_day(self, screening_group_id: int, dayOfNextIntervention: int):
         """
-        Test non-isolated individuals in one screening_group during one day.
+        Test non-isolated individuals in one screening_group on one day.
 
         Assumptions:
         - There is no upper bound on the amount of tests per day.
@@ -144,22 +152,26 @@ class SimulationRunner:
         group_testing = OneStageGroupTesting(ids=pools, viral_loads=viral_loads)
         test_results, diagnostics = group_testing.run_one_stage_group_testing()
 
-        # TODO: pass test_results to update isolation status in self.model
+        # pass test_results to update isolation status in self.model
         for pool_idx, pool in enumerate(pools):
             for individual_idx, individual in enumerate(pool):
                 if test_results[pool_idx][individual_idx] == 1:
                     self.model.set_positive(individual, True)
                     self.model.set_isolation(individual, True)
 
-                    # TODO: when we isolate someone through testing
-                    # make sure to change their state in model from X to QX
+        self.daily_results.append(diagnostics)
 
-        self.results.append(diagnostics)
+        performance = self.get_cumulative_test_performance() # cumulative test performance
+        performance["day"] = dayOfNextIntervention
+        performance["cumRecovered"] = self.model.total_num_recovered() # this is an np array # TODO: revisit
 
-        with open(
-            os.path.join(self.output_path, f"results_{self.seed}.pickle"), "wb"
-        ) as f:
-            pickle.dump(self.results, f)
+        self.overall_results.append(performance)
+
+        if self.save_results:
+            with open(
+                os.path.join(self.output_path, f"results_{self.seed}.pickle"), "wb"
+            ) as f:
+                pickle.dump(self.overall_results, f)
 
     def run_simulation(self):
         r"""
@@ -169,7 +181,7 @@ class SimulationRunner:
         dayOfNextIntervention = 0
         self.model.tmax = self.T
 
-        # if time % 10 == 0, save snapshot of current viral loads
+        # TODO [P1]: if time % 10 == 0, save snapshot of current viral loads
 
         while True:
             # first run a model iteration, i.e., one transition
@@ -182,34 +194,36 @@ class SimulationRunner:
             # implement testing at the start of each day, on 0, 1, ..., T-1,
             while dayOfNextIntervention <= int(self.model.t):
                 group_id = dayOfNextIntervention % self.num_groups
-                self.run_screening_one_day(group_id)
+                self.run_screening_one_day(group_id, dayOfNextIntervention)
                 dayOfNextIntervention += 1
 
-    # YZ: feel free to rename or change return type
-    def get_performance(self):
+    def get_cumulative_test_performance(self):
         r"""
         Compute the sensitivity and test consumption of a testing strategy over time.
 
-        self.results is a list of dicts where each dict contains results of
+        self.daily_results is a list of dicts where each dict contains results of
         group testing conducted on one screening group on one day.
         Keys are 'sensitivity', 'num_tests, 'num_positives', 'num_identified'.
 
         Returns:
-            cum_num_positives: cumulative number of positive individuals in the tests so far
-            cum_num_identified: cumulative number of positive individuals identified in the tests so far
+            cum_num_positives: cumulative number of positive samples screened so far
+            cum_num_identified: cumulative number of positive samples identified in the screening so far
             cum_sensitivity: cumulative sensitivity of the tests (cum_num_identified / cum_num_positives)
             cum_num_tests: cumulative number of PCR tests consumed so far
         """
 
-        cum_num_positives = sum([result["num_positives"] for result in self.results])
+        cum_num_positives = sum([result["num_positives"] for result in self.daily_results])
 
-        cum_num_identified = sum([result["num_identified"] for result in self.results])
+        cum_num_identified = sum([result["num_identified"] for result in self.daily_results])
 
         if cum_num_positives > 0:
             cum_sensitivity = cum_num_identified / cum_num_positives
         else:
             cum_sensitivity = float("nan")
 
-        cum_num_tests = sum([result["num_tests"] for result in self.results])
+        cum_num_tests = sum([result["num_tests"] for result in self.daily_results])
 
-        return cum_num_positives, cum_num_identified, cum_sensitivity, cum_num_tests
+        return {"cum_num_positives": cum_num_positives,
+                "cum_num_identified": cum_num_identified,
+                "cum_sensitivity": cum_sensitivity,
+                "cum_num_tests": cum_num_tests,}
