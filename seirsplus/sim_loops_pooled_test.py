@@ -220,14 +220,24 @@ class SimulationRunner:
         return cum_num_positives, cum_num_identified, cum_sensitivity, cum_num_tests
 
 
-# sketch of overall loop
-# this will be in a separate .py file I think
+"""
+Sketch code for running full loop, as exemplified in test_sim_runner.ipynb
 
-# def run_full_loop(T):
+(Using a yaml file?)
+set population size N
+set INIT_EXPOSED = init_prevalence * N
+set simulation time T
+set output path to be sth like "../results/US_N=10000_p=0.01_T=100"
 
-    # create model class
+for seed in seeds:
+    generate graph using generate_demographic_contact_network()
+    initialize ViralExtSEIRNetworkModel
+    for strategy in ["NP", "CP"]:
+        intialize SimulationRunner
+        SimulationRunner.run_simulation()
+        SimulationRunner.get_performance() # maybe save these 
+"""
 
-    # generate screening assignment groups
-
-    # create screening class passing in (model, screening_assignment, T)
-    # call screening.run_screening_full()
+"""
+Then, need code for loading and aggregating the experiment results.
+"""

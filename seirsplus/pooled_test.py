@@ -106,7 +106,7 @@ def run_one_PCR_test(
 
     if individual:
         N_templates = np.random.binomial(
-            V_sample * np.array(mu, dtype=int), c_1 * xi * c_2
+            V_sample * np.array(mu).astype(int), c_1 * xi * c_2
         )
         return list(N_templates >= LoD)
 
