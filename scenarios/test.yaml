@@ -1,0 +1,15 @@
+
+"population_size": 10000
+
+"init_prevalence": 0.01
+
+"simulation_time": 100
+
+"num_groups": 10
+"pool_size": 5
+
+"beta": 0.1
+"sigma": 0.2
+"lamda": 0.5
+"gamma": 0.25
+
