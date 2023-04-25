@@ -1,9 +1,9 @@
 
-population_size: 10000
+pop_size: 10000
 
-init_prevalence: 0.01
+init_prev: 0.01
 
-simulation_time: 100
+horizon: 100
 
 num_groups: 10
 pool_size: 5
