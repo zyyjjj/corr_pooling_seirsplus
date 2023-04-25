@@ -84,6 +84,9 @@ class SimulationRunner:
         # list of dicts where each dict logs the day, the total number recovered, and the cumulative test performance so far
         self.overall_results = []
 
+        print("Running simulation with seed ", self.seed, " for strategy ", \
+              self.pooling_strategy, "...")
+
     def get_groups(self, graph: Graph, cluster_size: int) -> dict[int, Any]:
         """Get the screening groups or pools for the simulation.
 
@@ -122,6 +125,8 @@ class SimulationRunner:
             test results
             statistics of test procedure, e.g., FNR and test consumption
         """
+
+        print("Running screening for group", screening_group_id, "on day", dayOfNextIntervention, "...")
 
         nodeStates = self.model.X.flatten()
 
