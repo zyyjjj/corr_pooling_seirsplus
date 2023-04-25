@@ -1,19 +1,20 @@
 # sim loop for tti sim with pooled tests
 from __future__ import division
 
-from typing import Optional, Any, Dict
-
 import math
+import os
 import pickle
 import random
 import time
-import os
+from typing import Any, Dict, Optional
 
-from networkx import Graph
 import numpy as np
+from networkx import Graph
+
+from seirsplus.assignment import embed_nodes, get_equal_sized_clusters
 from seirsplus.pooled_test import OneStageGroupTesting
 from seirsplus.viral_model import ViralExtSEIRNetworkModel
-from seirsplus.assignment import embed_nodes, get_equal_sized_clusters
+
 
 class SimulationRunner:
     """Runner class for SEIRS+ simulation with pooled testing."""
@@ -75,7 +76,6 @@ class SimulationRunner:
         # initialize results
         self.results = []
 
-
     def get_groups(self, graph: Graph, cluster_size: int) -> dict[int, Any]:
         """Get the screening groups or pools for the simulation.
 
@@ -116,20 +116,20 @@ class SimulationRunner:
         nodeStates = self.model.X.flatten()
 
         # test those in the screening_group and *not isolated*
-        screening_group = self.screening_groups[screening_group_id] # list of IDs
+        screening_group = self.screening_groups[screening_group_id]  # list of IDs
         screening_group = [
             x for x in screening_group if nodeStates[x] not in self.isolation_states
         ]
 
         # update VL for everyone except self.model.transitionNode
-        self.model.update_VL(nodes_to_exclude=[self.model.transitionNode]) 
-        
+        self.model.update_VL(nodes_to_exclude=[self.model.transitionNode])
+
         # divide individuals in screening group into pools according to pooling strategy
         # store pooling result and viral loads in nested lists
         if self.pooling_strategy == "correlated":
             pools = self.get_groups(
-                graph=self.model.G.subgraph(screening_group), 
-                cluster_size=self.pool_size
+                graph=self.model.G.subgraph(screening_group),
+                cluster_size=self.pool_size,
             )
             pools = [v for _, v in pools.items()]  # a list of lists
         elif self.pooling_strategy == "naive":
@@ -139,8 +139,7 @@ class SimulationRunner:
                 for i in range(0, len(screening_group), self.pool_size)
             ]
         viral_loads = [
-            [int(10 ** self.model.current_VL[x]) for x in pool]
-            for pool in pools
+            [int(10 ** self.model.current_VL[x]) for x in pool] for pool in pools
         ]
         group_testing = OneStageGroupTesting(ids=pools, viral_loads=viral_loads)
         test_results, diagnostics = group_testing.run_one_stage_group_testing()
@@ -157,9 +156,10 @@ class SimulationRunner:
 
         self.results.append(diagnostics)
 
-        with open(os.path.join(self.output_path, f'results_{self.seed}.pickle'), 'wb') as f:
+        with open(
+            os.path.join(self.output_path, f"results_{self.seed}.pickle"), "wb"
+        ) as f:
             pickle.dump(self.results, f)
-
 
     def run_simulation(self):
         r"""
@@ -167,11 +167,9 @@ class SimulationRunner:
         """
 
         dayOfNextIntervention = 0
-        self.model.tmax  = self.T
+        self.model.tmax = self.T
 
         # if time % 10 == 0, save snapshot of current viral loads
-        
-        while True:
 
         while True:
             # first run a model iteration, i.e., one transition
@@ -181,19 +179,19 @@ class SimulationRunner:
                 break
 
             # make sure we don't skip any days due to the transition
-            # implement testing at the start of each day, on 0, 1, ..., T-1, 
+            # implement testing at the start of each day, on 0, 1, ..., T-1,
             while dayOfNextIntervention <= int(self.model.t):
                 group_id = dayOfNextIntervention % self.num_groups
                 self.run_screening_one_day(group_id)
                 dayOfNextIntervention += 1
-    
+
     # YZ: feel free to rename or change return type
     def get_performance(self):
-        r""" 
+        r"""
         Compute the sensitivity and test consumption of a testing strategy over time.
-        
-        self.results is a list of dicts where each dict contains results of 
-        group testing conducted on one screening group on one day. 
+
+        self.results is a list of dicts where each dict contains results of
+        group testing conducted on one screening group on one day.
         Keys are 'sensitivity', 'num_tests, 'num_positives', 'num_identified'.
 
         Returns:
@@ -203,42 +201,15 @@ class SimulationRunner:
             cum_num_tests: cumulative number of PCR tests consumed so far
         """
 
-        cum_num_positives = sum(
-            [result['num_positives'] for result in self.results]
-        )
+        cum_num_positives = sum([result["num_positives"] for result in self.results])
 
-        cum_num_identified = sum(
-            [result['num_identified'] for result in self.results]
-        )
+        cum_num_identified = sum([result["num_identified"] for result in self.results])
 
         if cum_num_positives > 0:
             cum_sensitivity = cum_num_identified / cum_num_positives
         else:
-            cum_sensitivity = float('nan')
+            cum_sensitivity = float("nan")
 
-        cum_num_tests = sum([result['num_tests'] for result in self.results])
+        cum_num_tests = sum([result["num_tests"] for result in self.results])
 
         return cum_num_positives, cum_num_identified, cum_sensitivity, cum_num_tests
-
-
-"""
-Sketch code for running full loop, as exemplified in test_sim_runner.ipynb
-
-(Using a yaml file?)
-set population size N
-set INIT_EXPOSED = init_prevalence * N
-set simulation time T
-set output path to be sth like "../results/US_N=10000_p=0.01_T=100"
-
-for seed in seeds:
-    generate graph using generate_demographic_contact_network()
-    initialize ViralExtSEIRNetworkModel
-    for strategy in ["NP", "CP"]:
-        intialize SimulationRunner
-        SimulationRunner.run_simulation()
-        SimulationRunner.get_performance() # maybe save these 
-"""
-
-"""
-Then, need code for loading and aggregating the experiment results.
-"""
