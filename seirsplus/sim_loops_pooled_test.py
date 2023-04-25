@@ -7,18 +7,20 @@ import math
 import pickle
 import random
 import time
+import os
 
 from networkx import Graph
 import numpy as np
-from pooled_test import OneStageGroupTesting
-from viral_model import ViralExtSEIRNetworkModel
-from assignment import embed_nodes, get_equal_sized_clusters
+from seirsplus.pooled_test import OneStageGroupTesting
+from seirsplus.viral_model import ViralExtSEIRNetworkModel
+from seirsplus.assignment import embed_nodes, get_equal_sized_clusters
 
 class SimulationRunner:
     """Runner class for SEIRS+ simulation with pooled testing."""
+
     def __init__(
         self,
-        model: ViralExtSEIRNetworkModel, 
+        model: ViralExtSEIRNetworkModel,
         pooling_strategy: str,
         T: int,
         num_groups: int,
@@ -26,24 +28,24 @@ class SimulationRunner:
         seed: int,
         output_path: Optional[str] = None,
     ):
-        r"""Initialize the simulation runner. 
-        
+        r"""Initialize the simulation runner.
+
         Args:
             model: A `ViralExtSEIRNetworkModel` object.
             T: Duration (in days) of the simulation.
             num_groups: Number of testing groups to split the population into.
             pool_size: Size of the pooled tests in one-stage group testing.
-            seed: The random seed for the simulation. 
+            seed: The random seed for the simulation.
             output_path: The directory to save the simulation results to.
-            
-        Returns: 
+
+        Returns:
             None.
         """
         # set manual seed
         self.seed = seed
         np.random.seed(self.seed)
         random.seed(self.seed)
-        
+
         # simulation setup
         self.model = model
         self.T = T
@@ -51,47 +53,48 @@ class SimulationRunner:
         self.pool_size = pool_size
         self.screening_groups = self.get_groups(
             graph=self.model.G,
-            cluster_size=math.ceil(self.model.numNodes / self.num_groups)
+            cluster_size=math.ceil(self.model.numNodes / self.num_groups),
         )
-        if pooling_strategy not in ['naive', 'correlated']:
-            raise NotImplementedError(f"Pooling strategy {pooling_strategy} not implemented.")
+        if pooling_strategy not in ["naive", "correlated"]:
+            raise NotImplementedError(
+                f"Pooling strategy {pooling_strategy} not implemented."
+            )
         self.pooling_strategy = pooling_strategy
         self.output_path = output_path
+        os.makedirs(self.output_path, exist_ok=True)
 
         self.isolation_states = [
-            model.Q_S, 
-            model.Q_E, 
-            model.Q_pre, 
-            model.Q_sym, 
-            model.Q_asym, 
-            model.Q_R
+            model.Q_S,
+            model.Q_E,
+            model.Q_pre,
+            model.Q_sym,
+            model.Q_asym,
+            model.Q_R,
         ]
-        
+
         # initialize results
-        self.results = {} # TODO
+        self.results = []
 
 
     def get_groups(self, graph: Graph, cluster_size: int) -> dict[int, Any]:
         """Get the screening groups or pools for the simulation.
-        
+
         Args:
             graph: The networkx graph object.
             cluster_size: The size of groups or pools into which we split the population.
         """
         embedding, node2vec_model = embed_nodes(graph)
         clusters = get_equal_sized_clusters(
-            X=embedding, 
+            X=embedding,
             model=node2vec_model,
             graph=graph,
             cluster_size=cluster_size,
         )  # dict of node_id to cluster id
-        cluster_ids = list(set(clusters.values())) # unique list of cluster ids
+        cluster_ids = list(set(clusters.values()))  # unique list of cluster ids
         groups = {
-            i: [x for x,v in clusters.items() if v == i] 
-            for i in cluster_ids
+            i: [x for x, v in clusters.items() if v == i] for i in cluster_ids
         }  # dict of cluster ids as the keys and the node ids as the values
         return groups
-
 
     def run_screening_one_day(self, screening_group_id: int):
         """
@@ -104,56 +107,58 @@ class SimulationRunner:
 
         Args:
             screening_group_id: ID of the group to be screened on this day
-        
+
         Returns / Saves:
-            test results 
+            test results
             statistics of test procedure, e.g., FNR and test consumption
         """
 
         nodeStates = self.model.X.flatten()
 
         # test those in the screening_group and *not isolated*
-        screening_group = self.screening_assignment[screening_group_id] # list of IDs
+        screening_group = self.screening_groups[screening_group_id] # list of IDs
         screening_group = [
-            x for x in screening_group 
-            if nodeStates[x] not in self.isolation_states
+            x for x in screening_group if nodeStates[x] not in self.isolation_states
         ]
-            
+
         # update VL for everyone except self.model.transitionNode
-        self.model.update_VL(nodes_to_exclude=[self.transitionNode]) 
+        self.model.update_VL(nodes_to_exclude=[self.model.transitionNode]) 
         
         # divide individuals in screening group into pools according to pooling strategy
         # store pooling result and viral loads in nested lists
-        if self.pooling_strategy == 'correlated':
+        if self.pooling_strategy == "correlated":
             pools = self.get_groups(
-                graph=self.model.G(screening_group), 
+                graph=self.model.G.subgraph(screening_group), 
                 cluster_size=self.pool_size
             )
-            pools = [v for _, v in pools.items()] # a list of lists 
-        elif self.pooling_strategy == 'naive':
+            pools = [v for _, v in pools.items()]  # a list of lists
+        elif self.pooling_strategy == "naive":
             random.shuffle(screening_group)
             pools = [
-                screening_group[i: i + self.pool_size] 
+                screening_group[i : i + self.pool_size]
                 for i in range(0, len(screening_group), self.pool_size)
             ]
-        viral_loads = [[self.model.current_VL[x] for x in pool] for pool in pools]
+        viral_loads = [
+            [int(10 ** self.model.current_VL[x]) for x in pool]
+            for pool in pools
+        ]
         group_testing = OneStageGroupTesting(ids=pools, viral_loads=viral_loads)
         test_results, diagnostics = group_testing.run_one_stage_group_testing()
-        
+
         # TODO: pass test_results to update isolation status in self.model
         for pool_idx, pool in enumerate(pools):
             for individual_idx, individual in enumerate(pool):
                 if test_results[pool_idx][individual_idx] == 1:
                     self.model.set_positive(individual, True)
                     self.model.set_isolation(individual, True)
-        
+
                     # TODO: when we isolate someone through testing
                     # make sure to change their state in model from X to QX
 
-        
-        # TODO: save diagnostics in self.results, key is day, val is diagnostics dict
-        # TODO: save self.results to self.output_path
-        
+        self.results.append(diagnostics)
+
+        with open(os.path.join(self.output_path, f'results_{self.seed}.pickle'), 'wb') as f:
+            pickle.dump(self.results, f)
 
 
     def run_simulation(self):
@@ -161,35 +166,79 @@ class SimulationRunner:
         Run screening for the full duration self.T.
         """
 
-        dayOfLastIntervention = 0
+        dayOfNextIntervention = 0
         self.model.tmax  = self.T
-        running = True
-        
-        while running:
 
+        # if time % 10 == 0, save snapshot of current viral loads
+        
+        while True:
+
+        while True:
             # first run a model iteration, i.e., one transition
             running = self.model.run_iteration()
 
+            if running == False:
+                break
+
             # make sure we don't skip any days due to the transition
-            # implement testing on each day
-            while dayOfLastIntervention <= int(self.model.t):
-                cadenceDayNumber = int(dayOfLastIntervention % self.cadence_cycle_length)
-                screening_group_id = self.day_to_screening_group[cadenceDayNumber]
-                self.run_screening_one_day(screening_group_id)
-                dayOfLastIntervention += 1
-            
-            if dayOfLastIntervention > self.T:
-                running = False
+            # implement testing at the start of each day, on 0, 1, ..., T-1, 
+            while dayOfNextIntervention <= int(self.model.t):
+                group_id = dayOfNextIntervention % self.num_groups
+                self.run_screening_one_day(group_id)
+                dayOfNextIntervention += 1
+    
+    # YZ: feel free to rename or change return type
+    def get_performance(self):
+        r""" 
+        Compute the sensitivity and test consumption of a testing strategy over time.
+        
+        self.results is a list of dicts where each dict contains results of 
+        group testing conducted on one screening group on one day. 
+        Keys are 'sensitivity', 'num_tests, 'num_positives', 'num_identified'.
+
+        Returns:
+            cum_num_positives: cumulative number of positive individuals in the tests so far
+            cum_num_identified: cumulative number of positive individuals identified in the tests so far
+            cum_sensitivity: cumulative sensitivity of the tests (cum_num_identified / cum_num_positives)
+            cum_num_tests: cumulative number of PCR tests consumed so far
+        """
+
+        cum_num_positives = sum(
+            [result['num_positives'] for result in self.results]
+        )
+
+        cum_num_identified = sum(
+            [result['num_identified'] for result in self.results]
+        )
+
+        if cum_num_positives > 0:
+            cum_sensitivity = cum_num_identified / cum_num_positives
+        else:
+            cum_sensitivity = float('nan')
+
+        cum_num_tests = sum([result['num_tests'] for result in self.results])
+
+        return cum_num_positives, cum_num_identified, cum_sensitivity, cum_num_tests
 
 
-# sketch of overall loop
-# this will be in a separate .py file I think
+"""
+Sketch code for running full loop, as exemplified in test_sim_runner.ipynb
 
-def run_full_loop(T):
+(Using a yaml file?)
+set population size N
+set INIT_EXPOSED = init_prevalence * N
+set simulation time T
+set output path to be sth like "../results/US_N=10000_p=0.01_T=100"
 
-    # create model class
+for seed in seeds:
+    generate graph using generate_demographic_contact_network()
+    initialize ViralExtSEIRNetworkModel
+    for strategy in ["NP", "CP"]:
+        intialize SimulationRunner
+        SimulationRunner.run_simulation()
+        SimulationRunner.get_performance() # maybe save these 
+"""
 
-    # generate screening assignment groups
-
-    # create screening class passing in (model, screening_assignment, T)
-    # call screening.run_screening_full()
+"""
+Then, need code for loading and aggregating the experiment results.
+"""

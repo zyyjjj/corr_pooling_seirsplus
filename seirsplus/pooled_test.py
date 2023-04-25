@@ -68,8 +68,16 @@ class OneStageGroupTesting:
 
         num_positives = sum([sum([v > 0 for v in vl]) for vl in self.viral_loads])
         num_identified = sum([sum(pool_res) for pool_res in res])
-        sensitivity = num_identified / num_positives
-        return res, {"sensitivity": sensitivity, "num_tests": num_tests}
+        if num_positives:
+            sensitivity = num_identified / num_positives
+        else:
+            sensitivity = float('nan')
+        return res, {
+            "sensitivity": sensitivity,
+            "num_tests": num_tests,
+            "num_positives": num_positives,
+            "num_identified": num_identified,
+        }
 
 
 def run_one_PCR_test(
@@ -98,14 +106,14 @@ def run_one_PCR_test(
 
     if individual:
         N_templates = np.random.binomial(
-            V_sample * np.array(mu, dtype=int), c_1 * xi * c_2
+            V_sample * np.array(mu).astype(int), c_1 * xi * c_2
         )
         return list(N_templates >= LoD)
 
     pool_size = len(mu)
     # copies of RNA in a subsample that is c_1 of the original volume
     N_subsamples = np.random.binomial(
-        V_sample * np.array(mu, dtype=int), c_1 / pool_size
+        V_sample * np.array(mu).astype(int), c_1 / pool_size
     )
     N_pre_extraction = np.sum(N_subsamples)
     # copies of extracted RNA in the PCR template
