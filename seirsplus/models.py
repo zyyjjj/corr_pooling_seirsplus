@@ -2724,8 +2724,6 @@ class ExtSEIRSNetworkModel():
         for isoNode in nodesExitingIsolation:
             self.set_isolation(node=isoNode, isolate=False)
 
-        # TODO: update group testing related states here, e.g. psi,
-
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Store system states
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
