@@ -172,9 +172,7 @@ class SimulationRunner:
             self.get_cumulative_test_performance()
         )  # cumulative test performance
         performance["day"] = dayOfNextIntervention
-        performance[
-            "cumRecovered"
-        ] = self.model.total_num_recovered()  # this is an np array # TODO: revisit
+        performance["cumRecovered"] = np.max(self.model.total_num_recovered())  
 
         self.overall_results.append(performance)
 
