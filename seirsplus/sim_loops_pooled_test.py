@@ -29,6 +29,7 @@ class SimulationRunner:
         seed: int,
         save_results: bool = True,
         output_path: Optional[str] = None,
+        verbose: bool = False,
     ):
         r"""Initialize the simulation runner.
 
@@ -40,6 +41,7 @@ class SimulationRunner:
             seed: The random seed for the simulation.
             save_results: Whether to save the simulation results, default True.
             output_path: The directory to save the simulation results to.
+            verbose: Whether to print the simulation progress, default False.
 
         Returns:
             None.
@@ -69,6 +71,7 @@ class SimulationRunner:
             if self.output_path is None:
                 raise ValueError("Please specify an output path to save the results.")
             os.makedirs(self.output_path, exist_ok=True)
+        self.verbose = verbose
 
         self.isolation_states = [
             model.Q_S,
@@ -84,10 +87,11 @@ class SimulationRunner:
         # list of dicts where each dict logs the day, the total number recovered, and the cumulative test performance so far
         self.overall_results = []
 
-        print("Running simulation with seed ", self.seed, " for strategy ", \
-              self.pooling_strategy, "...")
+        if verbose:
+            print("Running simulation with seed ", self.seed, " for strategy ", \
+                self.pooling_strategy, "...")
 
-    def get_groups(self, graph: Graph, cluster_size: int) -> dict[int, Any]:
+    def get_groups(self, graph: Graph, cluster_size: int) -> Dict[int, Any]:
         """Get the screening groups or pools for the simulation.
 
         Args:
@@ -126,7 +130,8 @@ class SimulationRunner:
             statistics of test procedure, e.g., FNR and test consumption
         """
 
-        print("Running screening for group", screening_group_id, "on day", dayOfNextIntervention, "...")
+        if self.verbose:
+            print("Running screening for group", screening_group_id, "on day", dayOfNextIntervention, "...")
 
         nodeStates = self.model.X.flatten()
 
@@ -206,7 +211,7 @@ class SimulationRunner:
                 self.run_screening_one_day(group_id, dayOfNextIntervention)
                 dayOfNextIntervention += 1
 
-    def get_cumulative_test_performance(self):
+    def get_cumulative_test_performance(self) -> Dict[str, float]:
         r"""
         Compute the sensitivity and test consumption of a testing strategy over time.
 
