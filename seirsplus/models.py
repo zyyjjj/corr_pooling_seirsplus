@@ -2907,77 +2907,77 @@ class ExtSEIRSNetworkModel():
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         topstack = numpy.zeros_like(self.tseries)
         if(any(Fseries) and plot_F=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Fseries<=0, self.tseries), numpy.ma.masked_where(Fseries<=0, topstack+Fseries), topstack, color=color_F, alpha=0.75, label='$F$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Fseries<0, self.tseries), numpy.ma.masked_where(Fseries<0, topstack+Fseries), topstack, color=color_F, alpha=0.75, label='$F$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Fseries<=0, self.tseries), numpy.ma.masked_where(Fseries<=0, topstack+Fseries),           color=color_F, zorder=3)
             topstack = topstack+Fseries
         
         if(any(Hseries) and plot_H=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Hseries<=0, self.tseries), numpy.ma.masked_where(Hseries<=0, topstack+Hseries), topstack, color=color_H, alpha=0.75, label='$H$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Hseries<0, self.tseries), numpy.ma.masked_where(Hseries<0, topstack+Hseries), topstack, color=color_H, alpha=0.75, label='$H$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Hseries<=0, self.tseries), numpy.ma.masked_where(Hseries<=0, topstack+Hseries),           color=color_H, zorder=3)
             topstack = topstack+Hseries
         
         if(combine_Q_infected and any(Q_infectedseries) and plot_Q_E=='stacked' and plot_Q_pre=='stacked' and plot_Q_sym=='stacked' and plot_Q_asym=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Q_infectedseries<=0, self.tseries), numpy.ma.masked_where(Q_infectedseries<=0, topstack+Q_infectedseries), topstack, facecolor=color_Q_infected, alpha=0.75, hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_{infected}$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Q_infectedseries<0, self.tseries), numpy.ma.masked_where(Q_infectedseries<0, topstack+Q_infectedseries), topstack, facecolor=color_Q_infected, alpha=0.75, hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_{infected}$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Q_infectedseries<=0, self.tseries), numpy.ma.masked_where(Q_infectedseries<=0, topstack+Q_infectedseries),           color=color_Q_infected, zorder=3)
             topstack = topstack+Q_infectedseries
 
         if(not combine_Q_infected and any(Q_Eseries) and plot_Q_E=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Q_Eseries<=0, self.tseries), numpy.ma.masked_where(Q_Eseries<=0, topstack+Q_Eseries), topstack, facecolor=color_Q_E, alpha=0.75, hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_E$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Q_Eseries<0, self.tseries), numpy.ma.masked_where(Q_Eseries<0, topstack+Q_Eseries), topstack, facecolor=color_Q_E, alpha=0.75, hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_E$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Q_Eseries<=0, self.tseries), numpy.ma.masked_where(Q_Eseries<=0, topstack+Q_Eseries),           color=color_Q_E, zorder=3)
             topstack = topstack+Q_Eseries
         
         if(any(Eseries) and plot_E=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Eseries<=0, self.tseries), numpy.ma.masked_where(Eseries<=0, topstack+Eseries), topstack, color=color_E, alpha=0.75, label='$E$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Eseries<0, self.tseries), numpy.ma.masked_where(Eseries<0, topstack+Eseries), topstack, color=color_E, alpha=0.75, label='$E$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Eseries<=0, self.tseries), numpy.ma.masked_where(Eseries<=0, topstack+Eseries),           color=color_E, zorder=3)
             topstack = topstack+Eseries
         
         if(not combine_Q_infected and any(Q_preseries) and plot_Q_pre=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Q_preseries<=0, self.tseries), numpy.ma.masked_where(Q_preseries<=0, topstack+Q_preseries), topstack, facecolor=color_Q_pre, alpha=0.75,  hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_{pre}$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Q_preseries<0, self.tseries), numpy.ma.masked_where(Q_preseries<0, topstack+Q_preseries), topstack, facecolor=color_Q_pre, alpha=0.75,  hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_{pre}$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Q_preseries<=0, self.tseries), numpy.ma.masked_where(Q_preseries<=0, topstack+Q_preseries),           color=color_Q_pre, zorder=3)
             topstack = topstack+Q_preseries
 
         if(any(I_preseries) and plot_I_pre=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(I_preseries<=0, self.tseries), numpy.ma.masked_where(I_preseries<=0, topstack+I_preseries), topstack, color=color_I_pre, alpha=0.75, label='$I_{pre}$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(I_preseries<0, self.tseries), numpy.ma.masked_where(I_preseries<0, topstack+I_preseries), topstack, color=color_I_pre, alpha=0.75, label='$I_{pre}$', zorder=2)
             ax.plot(        numpy.ma.masked_where(I_preseries<=0, self.tseries), numpy.ma.masked_where(I_preseries<=0, topstack+I_preseries),           color=color_I_pre, zorder=3)
             topstack = topstack+I_preseries
         
         if(not combine_Q_infected and any(Q_symseries) and plot_Q_sym=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Q_symseries<=0, self.tseries), numpy.ma.masked_where(Q_symseries<=0, topstack+Q_symseries), topstack, facecolor=color_Q_sym, alpha=0.75,  hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_{sym}$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Q_symseries<0, self.tseries), numpy.ma.masked_where(Q_symseries<0, topstack+Q_symseries), topstack, facecolor=color_Q_sym, alpha=0.75,  hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_{sym}$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Q_symseries<=0, self.tseries), numpy.ma.masked_where(Q_symseries<=0, topstack+Q_symseries),           color=color_Q_sym, zorder=3)
             topstack = topstack+Q_symseries
 
         if(any(I_symseries) and plot_I_sym=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(I_symseries<=0, self.tseries), numpy.ma.masked_where(I_symseries<=0, topstack+I_symseries), topstack, color=color_I_sym, alpha=0.75, label='$I_{sym}$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(I_symseries<0, self.tseries), numpy.ma.masked_where(I_symseries<0, topstack+I_symseries), topstack, color=color_I_sym, alpha=0.75, label='$I_{sym}$', zorder=2)
             ax.plot(        numpy.ma.masked_where(I_symseries<=0, self.tseries), numpy.ma.masked_where(I_symseries<=0, topstack+I_symseries),           color=color_I_sym, zorder=3)
             topstack = topstack+I_symseries
         
         if(not combine_Q_infected and any(Q_asymseries) and plot_Q_asym=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Q_asymseries<=0, self.tseries), numpy.ma.masked_where(Q_asymseries<=0, topstack+Q_asymseries), topstack, facecolor=color_Q_asym, alpha=0.75,  hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_{asym}$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Q_asymseries<0, self.tseries), numpy.ma.masked_where(Q_asymseries<0, topstack+Q_asymseries), topstack, facecolor=color_Q_asym, alpha=0.75,  hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_{asym}$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Q_asymseries<=0, self.tseries), numpy.ma.masked_where(Q_asymseries<=0, topstack+Q_asymseries),           color=color_Q_asym, zorder=3)
             topstack = topstack+Q_asymseries
 
         if(any(I_asymseries) and plot_I_asym=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(I_asymseries<=0, self.tseries), numpy.ma.masked_where(I_asymseries<=0, topstack+I_asymseries), topstack, color=color_I_asym, alpha=0.75, label='$I_{asym}$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(I_asymseries<0, self.tseries), numpy.ma.masked_where(I_asymseries<0, topstack+I_asymseries), topstack, color=color_I_asym, alpha=0.75, label='$I_{asym}$', zorder=2)
             ax.plot(        numpy.ma.masked_where(I_asymseries<=0, self.tseries), numpy.ma.masked_where(I_asymseries<=0, topstack+I_asymseries),           color=color_I_asym, zorder=3)
             topstack = topstack+I_asymseries
         
         if(any(Q_Rseries) and plot_Q_R=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Q_Rseries<=0, self.tseries), numpy.ma.masked_where(Q_Rseries<=0, topstack+Q_Rseries), topstack, facecolor=color_Q_R, alpha=0.75, hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_R$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Q_Rseries<0, self.tseries), numpy.ma.masked_where(Q_Rseries<0, topstack+Q_Rseries), topstack, facecolor=color_Q_R, alpha=0.75, hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_R$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Q_Rseries<=0, self.tseries), numpy.ma.masked_where(Q_Rseries<=0, topstack+Q_Rseries),           color=color_Q_R, zorder=3)
             topstack = topstack+Q_Rseries
 
         if(any(Rseries) and plot_R=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Rseries<=0, self.tseries), numpy.ma.masked_where(Rseries<=0, topstack+Rseries), topstack, color=color_R, alpha=0.75, label='$R$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Rseries<0, self.tseries), numpy.ma.masked_where(Rseries<0, topstack+Rseries), topstack, color=color_R, alpha=0.75, label='$R$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Rseries<=0, self.tseries), numpy.ma.masked_where(Rseries<=0, topstack+Rseries),           color=color_R, zorder=3)
             topstack = topstack+Rseries
         
         if(any(Q_Sseries) and plot_Q_S=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Q_Sseries<=0, self.tseries), numpy.ma.masked_where(Q_Sseries<=0, topstack+Q_Sseries), topstack, facecolor=color_Q_S, alpha=0.75, hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_S$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Q_Sseries<0, self.tseries), numpy.ma.masked_where(Q_Sseries<0, topstack+Q_Sseries), topstack, facecolor=color_Q_S, alpha=0.75, hatch='//////', edgecolor='white', linewidth=0.0, label='$Q_S$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Q_Sseries<=0, self.tseries), numpy.ma.masked_where(Q_Sseries<=0, topstack+Q_Sseries),           color=color_Q_S, zorder=3)
             topstack = topstack+Q_Sseries
 
         if(any(Sseries) and plot_S=='stacked'):
-            ax.fill_between(numpy.ma.masked_where(Sseries<=0, self.tseries), numpy.ma.masked_where(Sseries<=0, topstack+Sseries), topstack, color=color_S, alpha=0.75, label='$S$', zorder=2)
+            ax.fill_between(numpy.ma.masked_where(Sseries<0, self.tseries), numpy.ma.masked_where(Sseries<0, topstack+Sseries), topstack, color=color_S, alpha=0.75, label='$S$', zorder=2)
             ax.plot(        numpy.ma.masked_where(Sseries<=0, self.tseries), numpy.ma.masked_where(Sseries<=0, topstack+Sseries),           color=color_S, zorder=3)
             topstack = topstack+Sseries
         
