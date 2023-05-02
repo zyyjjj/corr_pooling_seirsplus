@@ -88,8 +88,10 @@ class SimulationRunner:
         self.overall_results = []
 
         if verbose:
-            print("Running simulation with seed ", self.seed, " for strategy ", \
-                self.pooling_strategy, "...")
+            print(
+                f"Running simulation with seed {self.seed} "
+                f"for strategy {self.pooling_strategy}..."
+            )
 
     def get_groups(self, graph: Graph, cluster_size: int) -> Dict[int, Any]:
         """Get the screening groups or pools for the simulation.
@@ -131,7 +133,10 @@ class SimulationRunner:
         """
 
         if self.verbose:
-            print("Running screening for group", screening_group_id, "on day", dayOfNextIntervention, "...")
+            print(
+                f"Running screening for group {screening_group_id} "
+                f"on day {dayOfNextIntervention}..."
+            )
 
         nodeStates = self.model.X.flatten()
 
@@ -177,7 +182,7 @@ class SimulationRunner:
             self.get_cumulative_test_performance()
         )  # cumulative test performance
         performance["day"] = dayOfNextIntervention
-        performance["cumRecovered"] = np.max(self.model.total_num_recovered())  
+        performance["cumRecovered"] = np.max(self.model.total_num_recovered())
 
         self.overall_results.append(performance)
 
