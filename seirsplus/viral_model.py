@@ -80,7 +80,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
     """
 
     def __init__(self, G, beta, sigma, lamda, gamma, 
-                    init_VL = INIT_VL_BY_STATE, VL_slopes = VL_SLOPES,
+                    init_VL = INIT_VL_BY_STATE, VL_slopes = VL_SLOPES, VL_ceiling = 12,
                     gamma_asym=None, eta=0, gamma_H=None, mu_H=0, alpha=1.0, xi=0, mu_0=0, nu=0, a=0, h=0, f=0, p=0,             
                     beta_local=None, beta_asym=None, beta_asym_local=None, beta_pairwise_mode='infected', delta=None, delta_pairwise_mode=None,
                     G_Q=None, beta_Q=None, beta_Q_local=None, sigma_Q=None, lamda_Q=None, eta_Q=None, gamma_Q_sym=None, gamma_Q_asym=None, alpha_Q=None, delta_Q=None,
@@ -108,6 +108,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         self.init_VL = init_VL
         self.VL_slopes = VL_slopes
+        self.VL_ceiling = VL_ceiling
         self.current_VL = -numpy.ones(self.numNodes) # TODO: should all be -1
 
         # VL value at the beginning of the current state
@@ -173,12 +174,13 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         if nodes_to_exclude == None:
             nodes_to_exclude = []
         
-        nodes_to_update = list(set(nodes_to_include)- set(nodes_to_exclude))
+        nodes_to_update = list(set(nodes_to_include) - set(nodes_to_exclude))
 
         for node in nodes_to_update:
             state = self.X[node][0]
             new_VL_val = self.current_state_init_VL[node] + self.VL_slopes[state] * self.timer_state[node]
             self.current_VL[node] = max(-1, new_VL_val) 
+            self.current_VL[node] = min(new_VL_val, self.VL_ceiling)
 
 
     def run_iteration(self, max_dt=None):
