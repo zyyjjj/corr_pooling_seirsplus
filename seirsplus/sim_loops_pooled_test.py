@@ -146,9 +146,6 @@ class SimulationRunner:
             x for x in screening_group if nodeStates[x] not in self.isolation_states
         ]
 
-        # update VL for everyone except self.model.transitionNode
-        self.model.update_VL(nodes_to_exclude=[self.model.transitionNode])
-
         # divide individuals in screening group into pools according to pooling strategy
         # store pooling result and viral loads in nested lists
         if self.pooling_strategy == "correlated":
@@ -214,6 +211,8 @@ class SimulationRunner:
             while dayOfNextIntervention <= int(self.model.t):
                 group_id = dayOfNextIntervention % self.num_groups
                 self.run_screening_one_day(group_id, dayOfNextIntervention)
+                if self.verbose:
+                    print("Screening day: ", dayOfNextIntervention, " self.model.t: ", self.model.t)
                 dayOfNextIntervention += 1
 
     def get_cumulative_test_performance(self) -> Dict[str, float]:

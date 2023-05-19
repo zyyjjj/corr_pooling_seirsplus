@@ -119,7 +119,11 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         self.initialize_VL()
     
-    def log_VL(self):
+    def save_VL_timeseries(self):
+        r"""
+        Record each node's viral load at the transitions throughout the simulation.
+        """
+        
         self.VL_over_time["time_points"].append(self.t)
         for node in range(self.numNodes):
             self.VL_over_time["VL_time_series"][node].append(self.current_VL[node])
@@ -144,7 +148,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             self.current_VL[node] = self.init_VL[state[0]]
             self.current_state_init_VL[node] = self.init_VL[state[0]]
         
-        self.log_VL()
+        self.save_VL_timeseries()
 
 
     def update_VL(
@@ -170,9 +174,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             and the new viral load is set to the init viral load of the new state.
 
         Args:
-            nodes_to_include: list of nodes to update VL for; 
-            nodes_to_exclude: list of nodes to not update VL for;
-                for both of them, if None, assume update VL for everyone 
+            nodes_to_include: list of nodes to update VL for; default to everyone
+            nodes_to_exclude: list of nodes to not update VL for; default to empty
         """
 
         # TODO: if the transition type is different, e.g., Isym to R or H
@@ -188,16 +191,12 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         for node in nodes_to_update:
             state = self.X[node][0]
             
-            # new_VL_val = self.current_VL[node] + \
-                # self.VL_slopes[state] * self.timer_state[node]
             new_VL_val = self.current_state_init_VL[node] + self.VL_slopes[state] * self.timer_state[node]  # TODO: change this line
-            if node % 500 == 0:
-                print(self.current_state_init_VL[node], self.VL_slopes[state], self.timer_state[node], new_VL_val)
-            
+
             self.current_VL[node] = max(-1, new_VL_val) 
             self.current_VL[node] = min(self.current_VL[node], self.VL_ceiling)
         
-        self.log_VL()
+        self.save_VL_timeseries()
 
 
     def run_iteration(self, max_dt=None):
@@ -233,6 +232,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             tau = (1/alpha)*numpy.log(float(1/r1)) # TODO: understand why log(1/r1) here
 
+            # print(f"Before transition time update, self.t: {self.t}, tau: {tau}")
+
             if(tau > max_dt):
                 # If the time to next event exceeds the max allowed interval,
                 # advance the system time by the max allowed interval,
@@ -250,6 +251,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             else:
                 self.t += tau
                 self.timer_state += tau
+            
+            # print(f"After transition time update, self.t: {self.t}")
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Compute which event takes place
@@ -265,15 +268,25 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Perform updates triggered by rate propensities:
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.update_VL()
+
             assert(self.X[transitionNode] == self.transitions[transitionType]['currentState'] and self.X[transitionNode]!=self.F), "Assertion error: Node "+str(transitionNode)+" has unexpected current state "+str(self.X[transitionNode])+" given the intended transition of "+str(transitionType)+"."
             self.X[transitionNode] = self.transitions[transitionType]['newState']
+
+            self.save_VL_timeseries()
 
             self.testedInCurrentState[transitionNode] = False
             self.timer_state[transitionNode] = 0.0 # reset timer, since transitionNode is in a new state
 
             # directly update VL to the initial VL level of the new state
             # self.current_VL[transitionNode] = self.init_VL[self.X[transitionNode][0]]
-            self.current_state_init_VL[transitionNode] = self.current_VL[transitionNode]
+            if(transitionType == 'StoE' or transitionType == 'QStoQE'):
+                self.current_state_init_VL[transitionNode] = 3.0
+                self.current_VL[transitionNode] = 3.0
+            else:      
+                self.current_state_init_VL[transitionNode] = self.current_VL[transitionNode]
+
+            # print(f"transitionNode: {transitionNode}, transitionType: {transitionType}, new state: {self.X[transitionNode][0]}, VL: {self.current_VL[transitionNode]}")
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -373,6 +386,6 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        # self.log_VL()
+        
 
         return True
