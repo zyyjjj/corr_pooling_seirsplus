@@ -110,12 +110,19 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         self.VL_slopes = VL_slopes
         self.VL_ceiling = VL_ceiling
         self.current_VL = -numpy.ones(self.numNodes) # TODO: should all be -1
-
+        self.VL_over_time = {
+            "time_points": [],
+            "VL_time_series": [[] for _ in range(self.numNodes)]
+        }
         # VL value at the beginning of the current state
         self.current_state_init_VL = -numpy.ones(self.numNodes)
 
         self.initialize_VL()
     
+    def log_VL(self):
+        self.VL_over_time["time_points"].append(self.t)
+        for node in range(self.numNodes):
+            self.VL_over_time["VL_time_series"][node].append(self.current_VL[node])
 
     def initialize_VL(self):
         r"""
@@ -136,6 +143,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         for node, state in enumerate(self.X):
             self.current_VL[node] = self.init_VL[state[0]]
             self.current_state_init_VL[node] = self.init_VL[state[0]]
+        
+        self.log_VL()
 
 
     def update_VL(
@@ -178,9 +187,17 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         for node in nodes_to_update:
             state = self.X[node][0]
-            new_VL_val = self.current_state_init_VL[node] + self.VL_slopes[state] * self.timer_state[node]
+            
+            # new_VL_val = self.current_VL[node] + \
+                # self.VL_slopes[state] * self.timer_state[node]
+            new_VL_val = self.current_state_init_VL[node] + self.VL_slopes[state] * self.timer_state[node]  # TODO: change this line
+            if node % 500 == 0:
+                print(self.current_state_init_VL[node], self.VL_slopes[state], self.timer_state[node], new_VL_val)
+            
             self.current_VL[node] = max(-1, new_VL_val) 
-            self.current_VL[node] = min(new_VL_val, self.VL_ceiling)
+            self.current_VL[node] = min(self.current_VL[node], self.VL_ceiling)
+        
+        self.log_VL()
 
 
     def run_iteration(self, max_dt=None):
@@ -255,7 +272,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             self.timer_state[transitionNode] = 0.0 # reset timer, since transitionNode is in a new state
 
             # directly update VL to the initial VL level of the new state
-            self.current_VL[transitionNode] = self.init_VL[self.X[transitionNode][0]]
+            # self.current_VL[transitionNode] = self.init_VL[self.X[transitionNode][0]]
             self.current_state_init_VL[transitionNode] = self.current_VL[transitionNode]
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -355,5 +372,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             return False
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        # self.log_VL()
 
         return True
