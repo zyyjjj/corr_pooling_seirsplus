@@ -225,30 +225,30 @@ class SimulationRunner:
         Keys are 'sensitivity', 'num_tests, 'num_positives', 'num_identified'.
 
         Returns:
-            cum_num_positives: cumulative number of positive samples screened so far
-            cum_num_identified: cumulative number of positive samples identified in the screening so far
+            cum_positives_screened: cumulative number of positive samples screened so far
+            cum_positives_identified: cumulative number of positive samples identified in the screening so far
             cum_sensitivity: cumulative sensitivity of the tests (cum_num_identified / cum_num_positives)
             cum_num_tests: cumulative number of PCR tests consumed so far
         """
 
-        cum_num_positives = sum(
+        cum_positives_screened = sum(
             [result["num_positives"] for result in self.daily_results]
         )
 
-        cum_num_identified = sum(
+        cum_positives_identified = sum(
             [result["num_identified"] for result in self.daily_results]
         )
 
-        if cum_num_positives > 0:
-            cum_sensitivity = cum_num_identified / cum_num_positives
+        if cum_positives_screened > 0:
+            cum_sensitivity = cum_positives_identified / cum_positives_screened
         else:
             cum_sensitivity = float("nan")
 
         cum_num_tests = sum([result["num_tests"] for result in self.daily_results])
 
         return {
-            "cum_num_positives": cum_num_positives,
-            "cum_num_identified": cum_num_identified,
+            "cum_positives_screened": cum_positives_screened,
+            "cum_positives_identified": cum_positives_identified,
             "cum_sensitivity": cum_sensitivity,
             "cum_num_tests": cum_num_tests,
         }
