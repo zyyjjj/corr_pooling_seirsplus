@@ -180,7 +180,11 @@ class SimulationRunner:
         )  # cumulative test performance
         performance["day"] = dayOfNextIntervention
         performance["cumRecovered"] = np.max(self.model.total_num_recovered())
-        performance["cumInfections"] = len(self.model.infectionsLog) + self.model.numE[0]
+        performance["cumInfections"] = len(self.model.infectionsLog) + \
+            self.model.numE[0] + self.model.numI_pre[0] + self.model.numI_sym[0] + \
+            self.model.numI_asym[0] + self.model.numH[0] + \
+            self.model.numQ_E[0] + self.model.numQ_pre[0] + self.model.numQ_sym[0] + \
+            self.model.numQ_asym[0]
 
         self.overall_results.append(performance)
 
