@@ -66,7 +66,8 @@ class OneStageGroupTesting:
             else:
                 res.append([False] * len(vl_))
 
-        num_positives = sum([sum([v > 0 for v in vl]) for vl in self.viral_loads])
+        num_positives_per_pool = [sum([v > 0 for v in vl]) for vl in self.viral_loads]
+        num_positives = sum(num_positives_per_pool)
         num_identified = sum([sum(pool_res) for pool_res in res])
         if num_positives:
             sensitivity = num_identified / num_positives
@@ -75,6 +76,7 @@ class OneStageGroupTesting:
         return res, {
             "sensitivity": sensitivity,
             "num_tests": num_tests,
+            "num_positives_per_pool": num_positives_per_pool,
             "num_positives": num_positives,
             "num_identified": num_identified,
         }

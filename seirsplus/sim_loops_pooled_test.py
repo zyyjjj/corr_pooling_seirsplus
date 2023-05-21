@@ -179,20 +179,23 @@ class SimulationRunner:
             self.get_cumulative_test_performance()
         )  # cumulative test performance
         performance["day"] = dayOfNextIntervention
-        performance["cumRecovered"] = np.max(self.model.total_num_recovered())
+        performance["cumRecovered"] = self.model.total_num_recovered(self.model.tidx)
         performance["cumInfections"] = (
-            self.model.numR[-1]
-            + self.model.numQ_R[-1]
-            + self.model.numE[-1]
-            + self.model.numI_pre[-1]
-            + self.model.numI_sym[-1]
-            + self.model.numI_asym[-1]
-            + self.model.numH[-1]
-            + self.model.numQ_E[-1]
-            + self.model.numQ_pre[-1]
-            + self.model.numQ_sym[-1]
-            + self.model.numQ_asym[-1]
+            self.model.numR[self.model.tidx]
+            + self.model.numQ_R[self.model.tidx]
+            + self.model.numE[self.model.tidx]
+            + self.model.numI_pre[self.model.tidx]
+            + self.model.numI_sym[self.model.tidx]
+            + self.model.numI_asym[self.model.tidx]
+            + self.model.numH[self.model.tidx]
+            + self.model.numQ_E[self.model.tidx]
+            + self.model.numQ_pre[self.model.tidx]
+            + self.model.numQ_sym[self.model.tidx]
+            + self.model.numQ_asym[self.model.tidx]
         )
+        performance["num_positives_in_pool_median"] = np.median(diagnostics["num_positives_per_pool"])
+        performance["num_positives_in_pool_1st_quartile"] = np.quantile(diagnostics["num_positives_per_pool"], 0.25)
+        performance["num_positives_in_pool_3rd_quartile"] = np.quantile(diagnostics["num_positives_per_pool"], 0.75)
 
         self.overall_results.append(performance)
 
