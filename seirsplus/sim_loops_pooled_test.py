@@ -180,11 +180,19 @@ class SimulationRunner:
         )  # cumulative test performance
         performance["day"] = dayOfNextIntervention
         performance["cumRecovered"] = np.max(self.model.total_num_recovered())
-        performance["cumInfections"] = len(self.model.infectionsLog) + \
-            self.model.numE[0] + self.model.numI_pre[0] + self.model.numI_sym[0] + \
-            self.model.numI_asym[0] + self.model.numH[0] + \
-            self.model.numQ_E[0] + self.model.numQ_pre[0] + self.model.numQ_sym[0] + \
-            self.model.numQ_asym[0]
+        performance["cumInfections"] = (
+            self.model.numR[-1]
+            + self.model.numQ_R[-1]
+            + self.model.numE[-1]
+            + self.model.numI_pre[-1]
+            + self.model.numI_sym[-1]
+            + self.model.numI_asym[-1]
+            + self.model.numH[-1]
+            + self.model.numQ_E[-1]
+            + self.model.numQ_pre[-1]
+            + self.model.numQ_sym[-1]
+            + self.model.numQ_asym[-1]
+        )
 
         self.overall_results.append(performance)
 
@@ -217,7 +225,12 @@ class SimulationRunner:
                 group_id = dayOfNextIntervention % self.num_groups
                 self.run_screening_one_day(group_id, dayOfNextIntervention)
                 if self.verbose:
-                    print("Screening day: ", dayOfNextIntervention, " self.model.t: ", self.model.t)
+                    print(
+                        "Screening day: ",
+                        dayOfNextIntervention,
+                        " self.model.t: ",
+                        self.model.t,
+                    )
                 dayOfNextIntervention += 1
 
     def get_cumulative_test_performance(self) -> Dict[str, float]:

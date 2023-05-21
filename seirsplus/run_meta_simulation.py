@@ -74,6 +74,7 @@ def run_simulation(
         lamda=lamda,
         gamma=gamma,
         initE=init_exposed,
+        seed=seed,
     )
 
     # initiate simulation runner
