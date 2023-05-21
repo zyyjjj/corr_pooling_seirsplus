@@ -180,7 +180,7 @@ class SimulationRunner:
         )  # cumulative test performance
         performance["day"] = dayOfNextIntervention
         performance["cumRecovered"] = np.max(self.model.total_num_recovered())
-        performance["cumInfections"] = len(self.model.infectionsLog)
+        performance["cumInfections"] = len(self.model.infectionsLog) + self.model.numE[0]
 
         self.overall_results.append(performance)
 
@@ -245,6 +245,8 @@ class SimulationRunner:
             cum_sensitivity = float("nan")
 
         cum_num_tests = sum([result["num_tests"] for result in self.daily_results])
+        # TODO: also need to retrive number of positives per pool
+        # [result["num_positives"] for result in self.daily_results] -- this is wrong, not per-pool
 
         return {
             "cum_positives_screened": cum_positives_screened,
