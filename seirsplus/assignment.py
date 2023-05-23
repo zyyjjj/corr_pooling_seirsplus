@@ -1,3 +1,5 @@
+import os
+import sys
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
@@ -14,7 +16,7 @@ def embed_nodes(
     dimensions: int = 32,
     walk_length: int = 20,
     num_walks: int = 10,
-    workers: int = 4,
+    workers: int = 1,
     window: int = 10,
     min_count: int = 1,
 ) -> Tuple[np.ndarray, Word2Vec]:

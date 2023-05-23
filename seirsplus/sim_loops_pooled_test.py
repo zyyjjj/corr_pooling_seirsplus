@@ -10,7 +10,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 from networkx import Graph
-
 from seirsplus.assignment import embed_nodes, get_equal_sized_clusters
 from seirsplus.pooled_test import OneStageGroupTesting
 from seirsplus.viral_model import ViralExtSEIRNetworkModel
