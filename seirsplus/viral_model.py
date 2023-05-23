@@ -8,7 +8,7 @@ from seirsplus.models import ExtSEIRSNetworkModel
 # TODO: later enable sampling from a distribution
 INIT_VL_BY_STATE = {
     1: -1, # S
-    2: 3, # E, by Larremore et al. 2021
+    2: 0, # E, by Larremore et al. 2021
     3: 6, # I_pre, taking the average of E and I_sym/I_asym
     4: 9, # I_sym, to start with
     5: 9, # I_asym, to start with, though could consider increasing
@@ -80,7 +80,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
     """
 
     def __init__(self, G, beta, sigma, lamda, gamma, 
-                    init_VL = INIT_VL_BY_STATE, VL_slopes = VL_SLOPES, VL_ceiling = 12,
+                    init_VL_by_state = INIT_VL_BY_STATE, VL_slopes = VL_SLOPES, VL_ceiling = 12,
                     gamma_asym=None, eta=0, gamma_H=None, mu_H=0, alpha=1.0, xi=0, mu_0=0, nu=0, a=0, h=0, f=0, p=0,             
                     beta_local=None, beta_asym=None, beta_asym_local=None, beta_pairwise_mode='infected', delta=None, delta_pairwise_mode=None,
                     G_Q=None, beta_Q=None, beta_Q_local=None, sigma_Q=None, lamda_Q=None, eta_Q=None, gamma_Q_sym=None, gamma_Q_asym=None, alpha_Q=None, delta_Q=None,
@@ -106,7 +106,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         # TODO: come back to this when integrating into SimulationRunner
         self.transitionNode = None 
 
-        self.init_VL = init_VL
+        self.init_VL_by_state = init_VL_by_state
         self.VL_slopes = VL_slopes
         self.VL_ceiling = VL_ceiling
         self.current_VL = -numpy.ones(self.numNodes) # TODO: should all be -1
@@ -114,6 +114,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             "time_points": [],
             "VL_time_series": [[] for _ in range(self.numNodes)]
         }
+        self.peak_VLs = []
+        self.time_in_pre_state = []
         # VL value at the beginning of the current state
         self.current_state_init_VL = -numpy.ones(self.numNodes)
 
@@ -145,8 +147,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         # for each node, get / sample initial viral load
         for node, state in enumerate(self.X):
-            self.current_VL[node] = self.init_VL[state[0]]
-            self.current_state_init_VL[node] = self.init_VL[state[0]]
+            self.current_VL[node] = self.init_VL_by_state[state[0]]
+            self.current_state_init_VL[node] = self.init_VL_by_state[state[0]]
         
         self.save_VL_timeseries()
 
@@ -274,19 +276,19 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             self.X[transitionNode] = self.transitions[transitionType]['newState']
 
             self.save_VL_timeseries()
+            if transitionType in ("IPREtoISYM", "IPREtoIASYM", "QPREtoQSYM", "QPREtoQASYM"):
+                self.time_in_pre_state.append(self.timer_state[transitionNode][0])
 
             self.testedInCurrentState[transitionNode] = False
             self.timer_state[transitionNode] = 0.0 # reset timer, since transitionNode is in a new state
 
             # directly update VL to the initial VL level of the new state
-            # self.current_VL[transitionNode] = self.init_VL[self.X[transitionNode][0]]
+            # self.current_VL[transitionNode] = self.init_VL_by_state[self.X[transitionNode][0]]
             if(transitionType == 'StoE' or transitionType == 'QStoQE'):
-                self.current_state_init_VL[transitionNode] = 3.0
-                self.current_VL[transitionNode] = 3.0
+                self.current_state_init_VL[transitionNode] = self.init_VL_by_state[2] # 2 for state E
+                self.current_VL[transitionNode] = self.init_VL_by_state[2]
             else:      
                 self.current_state_init_VL[transitionNode] = self.current_VL[transitionNode]
-
-            # print(f"transitionNode: {transitionNode}, transitionType: {transitionType}, new state: {self.X[transitionNode][0]}, VL: {self.current_VL[transitionNode]}")
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -302,6 +304,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                                             'local_contact_node_states':    self.X[transitionNode_GNbrs].flatten(),
                                             'isolation_contact_nodes':      transitionNode_GQNbrs,
                                             'isolation_contact_node_states':self.X[transitionNode_GQNbrs].flatten() })
+            if transitionType in ("IPREtoISYM", "IPREtoIASYM", "QPREtoQSYM", "QPREtoQASYM"):
+                self.peak_VLs.append(self.current_VL[transitionNode])
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
