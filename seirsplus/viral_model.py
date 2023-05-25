@@ -109,7 +109,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         self.init_VL_by_state = init_VL_by_state
         self.VL_slopes = VL_slopes
         self.VL_ceiling = VL_ceiling
-        self.current_VL = -numpy.ones(self.numNodes) # TODO: should all be -1
+        self.current_VL = -numpy.ones(self.numNodes)
         self.VL_over_time = {
             "time_points": [],
             "VL_time_series": [[] for _ in range(self.numNodes)]
@@ -120,6 +120,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         self.current_state_init_VL = -numpy.ones(self.numNodes)
 
         self.initialize_VL()
+
+        self.transitions_log = []
     
     def save_VL_timeseries(self):
         r"""
@@ -220,6 +222,11 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         propensities, transitionTypes = self.calc_propensities()
 
+        print(
+            "    calling model.run_iteration(), time: ", self.t, 
+            ", propensities.sum(): ", propensities.sum(),
+            ", propensities of node 926: ", propensities[926])
+
         if(propensities.sum() > 0): # NOTE: transition only happens if someone has the propensity to do so, not according to discrete time steps
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -311,6 +318,10 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
             if(transitionType in ['EtoQE', 'IPREtoQPRE', 'ISYMtoQSYM', 'IASYMtoQASYM', 'ISYMtoH']):
                 self.set_positive(node=transitionNode, positive=True)
+            
+            transition_info_tmp = {"t": self.t, "transitionNode": self.transitionNode, "transitionNodeVL": self.current_VL[self.transitionNode], "transitionType": transitionType}
+            print(transition_info_tmp)
+            self.transitions_log.append(transition_info_tmp)
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
