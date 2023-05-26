@@ -234,8 +234,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 print(f"        node{i}, in state {self.X[i]}, propensity {p_list}")
 
         print(
-            "    propensities.sum(): ", propensities.sum(),
-            ", propensities of node 926: ", propensities[926])
+            "    propensities.sum(): ", propensities.sum())
 
         if(propensities.sum() > 0): # NOTE: transition only happens if someone has the propensity to do so, not according to discrete time steps
 
