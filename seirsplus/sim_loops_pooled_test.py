@@ -29,6 +29,7 @@ class SimulationRunner:
         save_results: bool = True,
         output_path: Optional[str] = None,
         verbose: bool = False,
+        max_dt: Optional[float] = None
     ):
         r"""Initialize the simulation runner.
 
@@ -41,6 +42,9 @@ class SimulationRunner:
             save_results: Whether to save the simulation results, default True.
             output_path: The directory to save the simulation results to.
             verbose: Whether to print the simulation progress, default False.
+            max_dt: Maximum allowed time-between-transition; if time till next
+                transition exceeds max_dt, advance the model by max_dt without
+                executing any transition. If None, defaults to T. 
 
         Returns:
             None.
@@ -53,6 +57,7 @@ class SimulationRunner:
         # simulation setup
         self.model = model
         self.T = T
+        self.max_dt = max_dt
         self.num_groups = num_groups
         self.pool_size = pool_size
         self.screening_groups = self.get_groups(
@@ -216,7 +221,7 @@ class SimulationRunner:
 
         while True:
             # first run a model iteration, i.e., one transition
-            running = self.model.run_iteration()
+            running = self.model.run_iteration(max_dt = self.max_dt)
 
             if running == False:
                 break

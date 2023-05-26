@@ -222,12 +222,24 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         propensities, transitionTypes = self.calc_propensities()
 
+        print("calling model.run_iteration(), time: ", self.t)
+
+        print("    Nodes with transition propensities:")
+        for i, prop in enumerate(propensities):
+            if sum(prop)>0:
+                p_list = []
+                for i_p, p in enumerate(prop):
+                    if p>0:
+                        p_list.append((transitionTypes[i_p], p))
+                print(f"        node{i}, in state {self.X[i]}, propensity {p_list}")
+
         print(
-            "    calling model.run_iteration(), time: ", self.t, 
-            ", propensities.sum(): ", propensities.sum(),
+            "    propensities.sum(): ", propensities.sum(),
             ", propensities of node 926: ", propensities[926])
 
         if(propensities.sum() > 0): # NOTE: transition only happens if someone has the propensity to do so, not according to discrete time steps
+
+            print("    propensities sum to >0")
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Calculate alpha
@@ -240,6 +252,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             # Compute the time until the next event takes place
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             tau = (1/alpha)*numpy.log(float(1/r1)) # TODO: understand why log(1/r1) here
+            print("    tau: ", tau)
 
             # print(f"Before transition time update, self.t: {self.t}, tau: {tau}")
 
@@ -322,6 +335,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             transition_info_tmp = {"t": self.t, "transitionNode": self.transitionNode, "transitionNodeVL": self.current_VL[self.transitionNode], "transitionType": transitionType}
             print(transition_info_tmp)
             self.transitions_log.append(transition_info_tmp)
+            print('\n')
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
