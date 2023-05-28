@@ -98,15 +98,15 @@ def _get_vl_with_plateau(
     else:
         vl = 0
     
-    return vl
+    return float(vl)
 
 
 def gen_vl_distribution_with_plateau(
     critical_time_points_bounds: List[Tuple[float]],
     peak_plateau_height_bounds: Tuple[float], # TODO: keep this fixed? or vary
     tail_plateau_height: float,
-    tail_plateau_duration: float, # TODO: double check
     num_samples: int,
+    noise: float = 0.5
 ):
     r"""Generate log10 viral load samples from a piecewise linear model with plateau.
 
@@ -119,6 +119,8 @@ def gen_vl_distribution_with_plateau(
             height of the peak plateau.
         tail_plateau_height: A float representing the height of the tail plateau.
         num_samples: The number of log10 viral load samples to generate.
+        noise: A float representing the standard deviation of the Gaussian noise
+            added to the sampled viral loads.
 
     Returns:
         A 1-d array of size `num_samples` representing the log10 viral load samples.
@@ -154,6 +156,7 @@ def gen_vl_distribution_with_plateau(
             tail_plateau_height,
             time_stamps[i]
         )
+        _vl += np.random.normal(0, noise)
         sampled_vls.append(_vl)
     
     return sampled_vls, time_stamps
