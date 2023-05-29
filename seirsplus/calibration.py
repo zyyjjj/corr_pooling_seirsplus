@@ -67,7 +67,7 @@ def gen_vl_distrbution(
 def _get_vl_with_plateau(
     critical_time_points: List[float],
     peak_plateau_height: float,
-    tail_plateau_height: float,
+    tail_height: float,
     sample_time: float,
 ):
     r"""Sample one log10 VL at a given time under the VL-with-plateau model.
@@ -77,7 +77,7 @@ def _get_vl_with_plateau(
             at which VL starts the peak plateau, starts decaying from the peak plateau, 
             enters the tail plateau, and drops to 0 from the tail plateau. # TODO: double check
         peak_plateau_height: A float representing the height of the peak plateau.
-        tail_plateau_height: A float representing the height of the tail plateau.
+        tail_height: A float representing the height of the tail.
         sample_time: A float representing the time at which to sample the VL.
     Returns:
         A float representing the log10 VL at the given time.
@@ -92,9 +92,9 @@ def _get_vl_with_plateau(
     elif sample_time < start_decay_time:
         vl = peak_plateau_height
     elif sample_time < start_tail_time:
-        vl = peak_plateau_height - (peak_plateau_height - tail_plateau_height) / (start_tail_time - start_decay_time) * (sample_time - start_decay_time)
+        vl = peak_plateau_height - (peak_plateau_height - tail_height) / (start_tail_time - start_decay_time) * (sample_time - start_decay_time)
     elif sample_time < end_tail_time:
-        vl = tail_plateau_height
+        vl = tail_height
     else:
         vl = 0
     
@@ -103,8 +103,8 @@ def _get_vl_with_plateau(
 
 def gen_vl_distribution_with_plateau(
     critical_time_points_bounds: List[Tuple[float]],
-    peak_plateau_height_bounds: Tuple[float], # TODO: keep this fixed? or vary
-    tail_plateau_height: float,
+    peak_plateau_height_bounds: Tuple[float], 
+    tail_height_bounds: Tuple[float],
     num_samples: int,
     noise: float = 0.5
 ):
@@ -117,7 +117,8 @@ def gen_vl_distribution_with_plateau(
             and drops to 0 from the tail plateau. 
         peak_plateau_height_bounds: A tuple of the form (min, max) for the
             height of the peak plateau.
-        tail_plateau_height: A float representing the height of the tail plateau.
+        tail_height_bounds: A tuple of the form (min, max) for the
+            height of the tail.
         num_samples: The number of log10 viral load samples to generate.
         noise: A float representing the standard deviation of the Gaussian noise
             added to the sampled viral loads.
@@ -144,6 +145,11 @@ def gen_vl_distribution_with_plateau(
         peak_plateau_height_bounds[1], 
         (num_samples, 1)
     )
+    tail_height_l = np.random.uniform(
+        tail_height_bounds[0], 
+        tail_height_bounds[1], 
+        (num_samples, 1)
+    )
 
     time_stamps = np.random.uniform(0, critical_time_points_l[:, -1], num_samples)
 
@@ -153,7 +159,7 @@ def gen_vl_distribution_with_plateau(
         _vl = _get_vl_with_plateau(
             critical_time_points_l[i], 
             peak_plateau_height_l[i], 
-            tail_plateau_height,
+            tail_height_l[i],
             time_stamps[i]
         )
         _vl += np.random.normal(0, noise)
