@@ -63,7 +63,6 @@ def gen_vl_distrbution(
     return (viral_loads, time_stamps, peaks)
 
 
-# TODO: later we can adapt this model to update the VL mechanism in ViralModel
 def _get_vl_with_plateau(
     critical_time_points: List[float],
     peak_plateau_height: float,
@@ -75,7 +74,7 @@ def _get_vl_with_plateau(
     Args:
         critical_time_points: A list of 4 floats reprensenting the time points 
             at which VL starts the peak plateau, starts decaying from the peak plateau, 
-            enters the tail plateau, and drops to 0 from the tail plateau. # TODO: double check
+            enters the tail plateau, and drops to 0 from the tail. 
         peak_plateau_height: A float representing the height of the peak plateau.
         tail_height: A float representing the height of the tail.
         sample_time: A float representing the time at which to sample the VL.
@@ -84,8 +83,6 @@ def _get_vl_with_plateau(
     """
 
     start_peak_time, start_decay_time, start_tail_time, end_tail_time = critical_time_points
-
-    vl = 0
 
     if sample_time < start_peak_time:
         vl = peak_plateau_height / start_peak_time * sample_time
@@ -106,15 +103,15 @@ def gen_vl_distribution_with_plateau(
     peak_plateau_height_bounds: Tuple[float], 
     tail_height_bounds: Tuple[float],
     num_samples: int,
-    noise: float = 0.5
+    noise: float = 0.0
 ):
     r"""Generate log10 viral load samples from a piecewise linear model with plateau.
 
     Args:
         critical_time_points_bounds: A 4-element list of tuples of the form 
             (min, max) for each time point at which VL starts the peak plateau, 
-            starts decaying from the peak plateau, enters the tail plateau, 
-            and drops to 0 from the tail plateau. 
+            starts decaying from the peak plateau, enters the constant tail, 
+            and drops to 0 from the tail. 
         peak_plateau_height_bounds: A tuple of the form (min, max) for the
             height of the peak plateau.
         tail_height_bounds: A tuple of the form (min, max) for the
@@ -122,11 +119,9 @@ def gen_vl_distribution_with_plateau(
         num_samples: The number of log10 viral load samples to generate.
         noise: A float representing the standard deviation of the Gaussian noise
             added to the sampled viral loads.
-
     Returns:
         A 1-d array of size `num_samples` representing the log10 viral load samples.
     """
-
 
     # sample critical time points
     critical_time_points_l = [
@@ -137,7 +132,7 @@ def gen_vl_distribution_with_plateau(
         )
         for i in range(len(critical_time_points_bounds))
     ]
-    critical_time_points_l = np.concatenate(critical_time_points_l, axis=1)  # shape: (num_samples, 3)
+    critical_time_points_l = np.concatenate(critical_time_points_l, axis=1)  # shape: (num_samples, 4)
 
     # sample the peak plateau heights
     peak_plateau_height_l = np.random.uniform(
