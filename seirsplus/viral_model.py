@@ -55,7 +55,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                     initE=0, initI_pre=0, initI_sym=0, initI_asym=0, initH=0, initR=0, initF=0,        
                     initQ_S=0, initQ_E=0, initQ_pre=0, initQ_sym=0, initQ_asym=0, initQ_R=0,
                     o=0, prevalence_ext=0,
-                    transition_mode='exponential_rates', node_groups=None, store_Xseries=False, seed=None):
+                    transition_mode='exponential_rates', node_groups=None, store_Xseries=False, seed=None, verbose=0):
 
         super().__init__(G, beta, sigma, lamda, gamma, 
                     gamma_asym=gamma_asym, eta=eta, gamma_H=gamma_H, mu_H=mu_H, alpha=alpha, xi=xi, mu_0=mu_0, nu=nu, a=a, h=h, f=f, p=p,             
@@ -70,7 +70,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         
         self.transitionNode = None 
 
-        self.current_VL = numpy.zeros(self.numNodes)
+        self.current_VL = -numpy.ones(self.numNodes)
         self.VL_params = VL_params
         self.VL_over_time = {
             "time_points": [],
@@ -111,6 +111,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         
         self.initialize_VL()
 
+        self.verbose = verbose
+
                     
     def save_VL_timeseries(self):
         r"""
@@ -129,6 +131,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         for node, state in enumerate(self.X):
             if state[0] in (2, 12): # E, Q_E:
+                self.current_VL[node] = 0
                 self.infection_start_times[node] = 0
             elif state[0] in (3, 13): # I_pre, Q_pre
                 self.current_VL[node] = self.VL_params_by_node[node]["peak_plateau_height"]
@@ -219,23 +222,25 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         propensities, transitionTypes = self.calc_propensities()
 
-        print("calling model.run_iteration(), time: ", self.t)
+        if self.verbose >= 1:
+            print("calling model.run_iteration(), time: ", self.t)
 
-        print("    Nodes with transition propensities:")
-        for i, prop in enumerate(propensities):
-            if sum(prop)>0:
-                p_list = []
-                for i_p, p in enumerate(prop):
-                    if p>0:
-                        p_list.append((transitionTypes[i_p], p))
-                print(f"        node{i}, in state {self.X[i]}, propensity {p_list}")
-
-        print(
-            "    propensities.sum(): ", propensities.sum())
+        if self.verbose==2:
+            print("    Nodes with transition propensities:")
+            for i, prop in enumerate(propensities):
+                if sum(prop)>0:
+                    p_list = []
+                    for i_p, p in enumerate(prop):
+                        if p>0:
+                            p_list.append((transitionTypes[i_p], p))
+                    print(f"        node{i}, in state {self.X[i]}, propensity {p_list}")
+            print(
+                "    propensities.sum(): ", propensities.sum())
 
         if(propensities.sum() > 0): # NOTE: transition only happens if someone has the propensity to do so, not according to discrete time steps
 
-            print("    propensities sum to >0")
+            if self.verbose >= 1:
+                print("    propensities sum to >0")
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Calculate alpha
@@ -248,7 +253,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             # Compute the time until the next event takes place
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             tau = (1/alpha)*numpy.log(float(1/r1)) # convert uniform to exponential RV
-            print("    tau: ", tau)
+            if self.verbose >= 1:
+                print("    tau: ", tau)
 
             # print(f"Before transition time update, self.t: {self.t}, tau: {tau}")
 
@@ -296,6 +302,9 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             self.testedInCurrentState[transitionNode] = False
             self.timer_state[transitionNode] = 0.0 # reset timer, since transitionNode is in a new state
 
+            if(transitionType == 'StoE' or transitionType == 'QStoQE'):
+                self.current_VL[transitionNode] = 0
+
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             # Save information about infection events when they occur:
@@ -322,7 +331,6 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             transition_info_tmp = {"t": self.t, "transitionNode": self.transitionNode, "transitionNodeVL": self.current_VL[self.transitionNode], "transitionType": transitionType}
             print(transition_info_tmp)
             self.transitions_log.append(transition_info_tmp)
-            print('\n')
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
