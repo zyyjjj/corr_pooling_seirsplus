@@ -4,57 +4,26 @@ import numpy
 
 from seirsplus.models import ExtSEIRSNetworkModel
 
-# initial log10 viral load by state
-# TODO: later enable sampling from a distribution
-INIT_VL_BY_STATE = {
-    1: -1, # S
-    2: 0, # E, by Larremore et al. 2021
-    3: 6, # I_pre, taking the average of E and I_sym/I_asym
-    4: 9, # I_sym, to start with
-    5: 9, # I_asym, to start with, though could consider increasing
-    6: 6, # H, to start with, keep same as R, though could consider increasing
-    7: 6, # R, by Larremore et al. 2021
-    8: -1, # F, ?
-    11: 0, # Q_S
-    12: 3, # Q_E
-    13: 6, # Q_pre
-    14: 9, # Q_sym
-    15: 9, # Q_asym
-    17: 6 # Q_R
+# range for uniform sampling of key parameters for temporal VL progression
+VL_PARAMS = {
+    "symptomatic": {
+        "start_peak": (1, 3), # I_pre
+        "end_peak": (4, 6), # I_sym
+        "start_tail": (11.5, 13.5), # I_sym
+        "end_tail": (15, 17), # R
+        "peak_height": (7.5, 10),
+        "tail_height": (3.5, 6)
+    },
+    "asymptomatic": {
+        "start_peak": (1, 3), # I_pre
+        "end_peak": (4, 6), # I_asym
+        "start_tail": (11, 11), # I_asym
+        "end_tail": (11, 11), # R
+        "peak_height": (5, 7),
+        "tail_height": (3, 3.5)
+    }
 }
-"""
-what Larremore et la. 2021 says about viral load progression
-(t_0, 3), where t_0 ~ Unif[2.5, 3.5]
-(t_peak, V_peak), where t_peak - t_0 ~ 0.5 + Gamma(1.5), capped at 3; V_peak ~ Unif[7, 11]
-(t_f, 6), where t_f - t_peak ~ Unif[4, 9]
-t_symptoms − t_peak ∼ unif[0, 3] -- symptom onset happens after VL peaks
-let's assume that VL is increasing in state I_pre and decreasing in states I_sym and I_asym
-"""
 
-# slope of log10 VL progression in different states -- TODO: think how to represent 0 viral load? use -1
-# TODO: later enable sampling from a distribution
-# TODO: to discuss (1) floor at 0? (2) ceiling at some max value? (3) int() when passing into group testing?
-VL_SLOPES = { 
-    1: 0., # S
-    2: 1., # E
-    3: 1., # I_pre
-    4: -1., # I_sym, ?
-    5: -1., # I_asym?
-    6: -1., # H
-    7: -1., # R
-    8: 0, # F
-    11: 0., # Q_S
-    12: 1., # Q_E
-    13: 1., # Q_pre
-    14: -1., # Q_sym
-    15: -1., # Q_asym
-    17: -1. # Q_R
-}
-"""
-The slopes and the initial state values should be consistent in the way that roughly
-initial VL at S1 + slope at S1 * (average time between S1 and S2) = initial VL at S2
-avg time between two states should be inverse of the transition rate
-"""
 
 class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
     r"""
@@ -64,14 +33,11 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
     as log-10 values.
      
     Additional params compared to ExtSEIRSNetworkModel:
-        init_VL: dict, initial log10 viral load in each state
-        VL_slopes: dict, slope of log10 viral load progression in each state
+        VL_params: dict of VL progression parameters for each node
     
     Additional variables compared to ExtSEIRSNetworkModel:
         self.current_VL: numpy array of size self.numNodes,
             tracks the current log10 viral load of each node
-        self.current_state_init_VL: numpy array, 
-            tracks the log10 viral load of each node at the start of the current state
         self.transitionNode: int, tracks the node that is currently undergoing
             transition. At daily screenings, our SimulationRunner computes the 
             updated viral load of all nodes eligible to participate in testing. 
@@ -80,7 +46,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
     """
 
     def __init__(self, G, beta, sigma, lamda, gamma, 
-                    init_VL_by_state = INIT_VL_BY_STATE, VL_slopes = VL_SLOPES, VL_ceiling = 12,
+                    VL_params = VL_PARAMS,
                     gamma_asym=None, eta=0, gamma_H=None, mu_H=0, alpha=1.0, xi=0, mu_0=0, nu=0, a=0, h=0, f=0, p=0,             
                     beta_local=None, beta_asym=None, beta_asym_local=None, beta_pairwise_mode='infected', delta=None, delta_pairwise_mode=None,
                     G_Q=None, beta_Q=None, beta_Q_local=None, sigma_Q=None, lamda_Q=None, eta_Q=None, gamma_Q_sym=None, gamma_Q_asym=None, alpha_Q=None, delta_Q=None,
@@ -102,27 +68,50 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                     o=o, prevalence_ext=prevalence_ext,
                     transition_mode=transition_mode, node_groups=node_groups, store_Xseries=store_Xseries, seed=seed)
         
-        # node currently undergoing a transition; "locked" and does not participate in screening
-        # TODO: come back to this when integrating into SimulationRunner
         self.transitionNode = None 
 
-        self.init_VL_by_state = init_VL_by_state
-        self.VL_slopes = VL_slopes
-        self.VL_ceiling = VL_ceiling
-        self.current_VL = -numpy.ones(self.numNodes)
+        self.current_VL = numpy.zeros(self.numNodes)
+        self.VL_params = VL_params
         self.VL_over_time = {
             "time_points": [],
             "VL_time_series": [[] for _ in range(self.numNodes)]
         }
         self.peak_VLs = []
         self.time_in_pre_state = []
-        # VL value at the beginning of the current state
-        self.current_state_init_VL = -numpy.ones(self.numNodes)
+        self.transitions_log = []
 
+        # start time of infections; initialize as large numbers for those never infected
+        self.infection_start_times = numpy.ones(self.numNodes)*100000
+
+        # assign (a)symptomatic nodes; this is independent from built-in parameter `a`
+        symptomatic_rv = numpy.random.rand(self.numNodes, 1)
+        self.symptomatic_by_node = symptomatic_rv > 0.3 
+
+        # draw VL progression params for each node
+        self.VL_params_by_node = {}
+        for node in range(self.numNodes):
+            key = "symptomatic" if self.symptomatic_by_node[node] else "asymptomatic"
+            critical_time_points = [numpy.random.uniform(bounds[0], bounds[1])
+                    for bounds in list(self.VL_params[key].values())[:4]]
+            peak_plateau_height = numpy.random.uniform(
+                self.VL_params[key]["peak_height"][0], self.VL_params[key]["peak_height"][1]
+            )
+            tail_height = numpy.random.uniform(
+                self.VL_params[key]["tail_height"][0], self.VL_params[key]["tail_height"][1]
+            )
+            self.VL_params_by_node[node] = {
+                "critical_time_points": critical_time_points,
+                "peak_plateau_height": peak_plateau_height,
+                "tail_height": tail_height
+            }
+            # update and override transition rate parameters
+            self.sigma[node] = 1 / critical_time_points[0]
+            self.lamda[node] = 1 / (critical_time_points[1]-critical_time_points[0])
+            self.gamma[node] = 1 / (critical_time_points[3]-critical_time_points[1])
+        
         self.initialize_VL()
 
-        self.transitions_log = []
-    
+                    
     def save_VL_timeseries(self):
         r"""
         Record each node's viral load at the transitions throughout the simulation.
@@ -136,22 +125,18 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         r"""
         Initialize the log10 viral load of each node at the start of the simulation.
         This function should be called in __init__().
-
-        The rationale for keeping this separate from update_VL() is the following:
-        if someone starts from an infectious state whose previous state also 
-            has positive viral load, 
-            then the initialized all-0 self.current_state_init_VL doesn't make sense;
-            instead we should generate a positive hypothetical last_state_log10_VL value
-            e.g., we sample the initial VL from some distribution like Brault's GMM
-        This logic is a bit too messy to implement in update_VL. So let's keep it separate.
-        In other words, update_VL would not involve any kind of sampling of the starting VL
         """
 
-        # for each node, get / sample initial viral load
         for node, state in enumerate(self.X):
-            self.current_VL[node] = self.init_VL_by_state[state[0]]
-            self.current_state_init_VL[node] = self.init_VL_by_state[state[0]]
-        
+            if state[0] in (2, 12): # E, Q_E:
+                self.infection_start_times[node] = 0
+            elif state[0] in (3, 13): # I_pre, Q_pre
+                self.current_VL[node] = self.VL_params_by_node[node]["peak_plateau_height"]
+                self.infection_start_times[node] = - self.VL_params_by_node[node]["critical_time_points"][0] # -start_peak_time
+            elif state[0] in (4, 14): # I_sym, Q_sym
+                self.current_VL[node] = self.VL_params_by_node[node]["peak_plateau_height"]
+                self.infection_start_times[node] = - self.VL_params_by_node[node]["critical_time_points"][1] # -end_peak_time
+
         self.save_VL_timeseries()
 
 
@@ -160,30 +145,17 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         nodes_to_include: List = None,
         nodes_to_exclude: List = None
         ):
-
         r"""
-        Update the log10 viral load of each node depending on their current state (self.X), 
-        and the time they have been in their current state (self.timer_state)
-
-        This function is called 
-        - every time a state transition happens (model.run_one_iteration()),
-        - and every time a screening takes place (run_tti_one_day()).
-
-        The overall logic of updating the VL: 
-        - the VL at the start of the current state defines a "baseline value"
-        - the current state maps to a slope of increase/decrease, either deterministic or sampled
-            (in initial stages, should be increasing; if recovering, should be decreasing)
-        - update goes like: new_VL = baseline_VL + slope * timer_state[i]
-        - this also works for new state transitions, since timer_state is reset to 0 
-            and the new viral load is set to the init viral load of the new state.
+        Update the log10 viral load of each node depending on the time since 
+        their infection started. The viral load of each node, if infected,
+        progresses over time following a piecewise linear function with parameters
+        specified in self.VL_params_by_node.
+        This function is called every time a state transition happens (model.run_iteration()).
 
         Args:
             nodes_to_include: list of nodes to update VL for; default to everyone
             nodes_to_exclude: list of nodes to not update VL for; default to empty
         """
-
-        # TODO: if the transition type is different, e.g., Isym to R or H
-        # the slope could be different; we choose to ignore that for now
 
         if nodes_to_include is None:
             nodes_to_include = list(range(self.numNodes))
@@ -193,17 +165,42 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         nodes_to_update = list(set(nodes_to_include) - set(nodes_to_exclude))
 
         for node in nodes_to_update:
-            state = self.X[node][0]
-            
-            new_VL_val = self.current_state_init_VL[node] + self.VL_slopes[state] * self.timer_state[node]  # TODO: change this line
+            start_peak_time, end_peak_time, start_tail_time, end_tail_time = self.VL_params_by_node[node]["critical_time_points"]
+            peak_plateau_height = self.VL_params_by_node[node]["peak_plateau_height"]
+            tail_height = self.VL_params_by_node[node]["tail_height"]
 
-            self.current_VL[node] = max(-1, new_VL_val) 
-            self.current_VL[node] = min(self.current_VL[node], self.VL_ceiling)
+            # if node is not infected, self.t - self.infection_start_times[node] is negative
+            if self.infection_start_times[node] < self.t:
+                sample_time = self.t - self.infection_start_times[node]
+                if sample_time < start_peak_time:
+                    vl = peak_plateau_height / start_peak_time * sample_time
+                elif sample_time < end_peak_time:
+                    vl = peak_plateau_height
+                elif sample_time < start_tail_time:
+                    vl = peak_plateau_height - (peak_plateau_height - tail_height) / (start_tail_time - end_peak_time) * (sample_time - end_peak_time)
+                elif sample_time < end_tail_time:
+                    vl = tail_height
+                else:
+                    vl = 0
+                
+                self.current_VL[node] = vl
         
         self.save_VL_timeseries()
 
 
     def run_iteration(self, max_dt=None):
+        r"""
+        Run one iteration of the model. 
+        - If sum of all nodes' propensities is 0, advance the time by 0.01 and do 
+            not run any state transitions.
+        - If sum of all nodes' propensities > 0, but the time until the next 
+            event exceeds `max_dt`, do not run any state transitions except
+            for releasing nodes who have been isolated for `self.isolation_time`
+            from isolation.
+        - If sum of all nodes' propensities >0 and the time until the next 
+            event does not exceed `max_dt`, execute the state transition and 
+            save the current VL and transition information.
+        """
 
         max_dt = self.tmax if max_dt is None else max_dt
 
@@ -250,7 +247,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Compute the time until the next event takes place
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            tau = (1/alpha)*numpy.log(float(1/r1)) # TODO: understand why log(1/r1) here
+            tau = (1/alpha)*numpy.log(float(1/r1)) # convert uniform to exponential RV
             print("    tau: ", tau)
 
             # print(f"Before transition time update, self.t: {self.t}, tau: {tau}")
@@ -273,8 +270,6 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 self.t += tau
                 self.timer_state += tau
             
-            # print(f"After transition time update, self.t: {self.t}")
-
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Compute which event takes place
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -301,14 +296,6 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             self.testedInCurrentState[transitionNode] = False
             self.timer_state[transitionNode] = 0.0 # reset timer, since transitionNode is in a new state
 
-            # directly update VL to the initial VL level of the new state
-            # self.current_VL[transitionNode] = self.init_VL_by_state[self.X[transitionNode][0]]
-            if(transitionType == 'StoE' or transitionType == 'QStoQE'):
-                self.current_state_init_VL[transitionNode] = self.init_VL_by_state[2] # 2 for state E
-                self.current_VL[transitionNode] = self.init_VL_by_state[2]
-            else:      
-                self.current_state_init_VL[transitionNode] = self.current_VL[transitionNode]
-
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             # Save information about infection events when they occur:
@@ -323,6 +310,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                                             'local_contact_node_states':    self.X[transitionNode_GNbrs].flatten(),
                                             'isolation_contact_nodes':      transitionNode_GQNbrs,
                                             'isolation_contact_node_states':self.X[transitionNode_GQNbrs].flatten() })
+                self.infection_start_times[transitionNode] = self.t
             if transitionType in ("IPREtoISYM", "IPREtoIASYM", "QPREtoQSYM", "QPREtoQASYM"):
                 self.peak_VLs.append(self.current_VL[transitionNode])
 
