@@ -197,9 +197,7 @@ class SimulationRunner:
             + self.model.numQ_sym[self.model.tidx]
             + self.model.numQ_asym[self.model.tidx]
         )
-        performance["num_positives_in_pool_median"] = np.median(diagnostics["num_positives_per_pool"])
-        performance["num_positives_in_pool_1st_quartile"] = np.quantile(diagnostics["num_positives_per_pool"], 0.25)
-        performance["num_positives_in_pool_3rd_quartile"] = np.quantile(diagnostics["num_positives_per_pool"], 0.75)
+        performance["mean_num_positives_in_positive_pool"] = np.mean(diagnostics["num_positives_per_positive_pool"])
 
         self.overall_results.append(performance)
 

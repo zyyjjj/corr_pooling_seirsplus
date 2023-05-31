@@ -1,15 +1,19 @@
+# param_to_vary: "init_prev"
 
 pop_size: 10000
 
-init_prev: 0.01
+init_prev: [0.001, 0.005, 0.01, 0.05, 0.1]
+init_prev_default: 0.01
 
 horizon: 100
 
 num_groups: 10
-pool_size: 5
 
-beta: 0.1
-sigma: 0.2
-lamda: 0.5
-gamma: 0.25
+pool_size: [5, 10]
+pool_size_default: 5
+
+beta: 0.5 # transmissibility
+sigma: 0.2 # rate E --> I_pre
+lamda: 0.5 # rate I_pre --> I_(a)sym
+gamma: 0.25 # rate I_sym --> R
 

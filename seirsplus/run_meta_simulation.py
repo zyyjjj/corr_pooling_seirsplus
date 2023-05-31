@@ -97,11 +97,24 @@ def run_simulation(
 if __name__ == "__main__":
     kwargs = yaml.load(open(sys.argv[1]), Loader=yaml.FullLoader)
     num_seeds = 1
+
+    # TODO: read params to vary from command line
+    # save params in path
+
+    param_to_vary = kwargs["param_to_vary"] 
+
     path = (
         f"../results/US_N={kwargs['pop_size']}_"
         f"p={kwargs['init_prev']}_T={kwargs['horizon']}/"
     )
     for seed in range(num_seeds):
+        for param in kwargs[param_to_vary]:
+            # output_path = os.path.join(path, param)
+            _ = run_simulation(
+                seed=seed,
+                output_path=output_path,
+                **kwargs,
+            )
         for pooling_strategy in ["naive", "correlated"]:
             output_path = os.path.join(path, pooling_strategy)
             _ = run_simulation(
