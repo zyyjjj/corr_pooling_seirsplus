@@ -188,8 +188,6 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 
                 self.current_VL[node] = vl
         
-        self.save_VL_timeseries()
-
 
     def run_iteration(self, max_dt=None):
         r"""
@@ -295,7 +293,6 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             assert(self.X[transitionNode] == self.transitions[transitionType]['currentState'] and self.X[transitionNode]!=self.F), "Assertion error: Node "+str(transitionNode)+" has unexpected current state "+str(self.X[transitionNode])+" given the intended transition of "+str(transitionType)+"."
             self.X[transitionNode] = self.transitions[transitionType]['newState']
 
-            self.save_VL_timeseries()
             if transitionType in ("IPREtoISYM", "IPREtoIASYM", "QPREtoQSYM", "QPREtoQASYM"):
                 self.time_in_pre_state.append(self.timer_state[transitionNode][0])
 
@@ -304,6 +301,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
             if(transitionType == 'StoE' or transitionType == 'QStoQE'):
                 self.current_VL[transitionNode] = 0
+
+            self.save_VL_timeseries()
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
