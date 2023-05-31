@@ -93,7 +93,7 @@ def _get_vl_with_plateau(
     elif sample_time < end_tail_time:
         vl = tail_height
     else:
-        vl = 0
+        vl = -1
     
     return float(vl)
 

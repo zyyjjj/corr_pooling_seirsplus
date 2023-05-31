@@ -184,7 +184,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 elif sample_time < end_tail_time:
                     vl = tail_height
                 else:
-                    vl = 0
+                    vl = -1
                 
                 self.current_VL[node] = vl
         
