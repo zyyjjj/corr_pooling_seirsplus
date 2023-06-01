@@ -197,6 +197,13 @@ class SimulationRunner:
             + self.model.numQ_sym[self.model.tidx]
             + self.model.numQ_asym[self.model.tidx]
         )
+        performance["cumActiveInfections"] = (
+            self.model.numE[self.model.tidx]
+            + self.model.numI_pre[self.model.tidx]
+            + self.model.numI_sym[self.model.tidx]
+            + self.model.numI_asym[self.model.tidx]
+            + self.model.numH[self.model.tidx]
+        )
         performance["mean_num_positives_in_positive_pool"] = np.mean(diagnostics["num_positives_per_positive_pool"])
 
         self.overall_results.append(performance)
