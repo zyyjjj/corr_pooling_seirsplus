@@ -120,7 +120,7 @@ def run_simulation_wrapper(seed, kwargs):
 if __name__ == "__main__":
 
     kwargs = yaml.load(open(sys.argv[1]), Loader=yaml.FullLoader)
-    num_seeds = 2
+    num_seeds = 10
 
     params_to_vary = parse(sys.argv[2:])
 
