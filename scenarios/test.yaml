@@ -9,8 +9,8 @@ horizon_default: 100
 num_groups: [5, 10, 20]
 num_groups_default: 10
 
-pool_size: [5, 10]
-pool_size_default: 5
+pool_size: [5, 10, 15, 20, 25, 30]
+pool_size_default: 10
 
 beta_default: 0.5 # transmissibility
 sigma_default: 0.2 # rate E --> I_pre
