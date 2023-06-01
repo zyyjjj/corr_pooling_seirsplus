@@ -102,8 +102,11 @@ def parse(arg_list):
     # experiment-running params -- read from command line input
     parser = argparse.ArgumentParser()
     parser.add_argument("--params_to_vary", type = str, nargs = "+", default = ["init_prev"])
-    
-    return parser.parse_args(arg_list).params_to_vary
+    parser.add_argument("--num_seeds", type = int)
+
+    args = parser.parse_args(arg_list)
+
+    return args.params_to_vary, args.num_seeds
 
 
 def run_simulation_wrapper(seed, kwargs):
@@ -120,9 +123,8 @@ def run_simulation_wrapper(seed, kwargs):
 if __name__ == "__main__":
 
     kwargs = yaml.load(open(sys.argv[1]), Loader=yaml.FullLoader)
-    num_seeds = 10
 
-    params_to_vary = parse(sys.argv[2:])
+    params_to_vary, num_seeds = parse(sys.argv[2:])
 
     param_values = {}
 
