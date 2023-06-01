@@ -2,6 +2,10 @@ import os
 import random
 import sys
 from typing import Optional
+import argparse
+import itertools
+from multiprocessing.pool import Pool
+
 
 import numpy as np
 import yaml
@@ -94,32 +98,57 @@ def run_simulation(
     return sim
 
 
+def parse(arg_list):
+    # experiment-running params -- read from command line input
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--params_to_vary", type = str, nargs = "+", default = ["init_prev"])
+    
+    return parser.parse_args(arg_list).params_to_vary
+
+
+def run_simulation_wrapper(seed, kwargs):
+    for pooling_strategy in ["naive", "correlated"]:
+        kwargs_ = kwargs.copy()
+        kwargs_["output_path"] = os.path.join(kwargs["output_path"], pooling_strategy)
+        _ = run_simulation(
+            seed=seed,
+            pooling_strategy=pooling_strategy,
+            **kwargs_,
+        )
+
+
 if __name__ == "__main__":
+
     kwargs = yaml.load(open(sys.argv[1]), Loader=yaml.FullLoader)
-    num_seeds = 1
+    num_seeds = 2
 
-    # TODO: read params to vary from command line
-    # save params in path
+    params_to_vary = parse(sys.argv[2:])
 
-    param_to_vary = kwargs["param_to_vary"] 
+    param_values = {}
 
-    path = (
-        f"../results/US_N={kwargs['pop_size']}_"
-        f"p={kwargs['init_prev']}_T={kwargs['horizon']}/"
-    )
-    for seed in range(num_seeds):
-        for param in kwargs[param_to_vary]:
-            # output_path = os.path.join(path, param)
-            _ = run_simulation(
-                seed=seed,
-                output_path=output_path,
-                **kwargs,
-            )
-        for pooling_strategy in ["naive", "correlated"]:
-            output_path = os.path.join(path, pooling_strategy)
-            _ = run_simulation(
-                seed=seed,
-                pooling_strategy=pooling_strategy,
-                output_path=output_path,
-                **kwargs,
-            )
+    for param in [
+        "init_prev", "num_groups", "pool_size",
+        "pop_size", "horizon", "beta", "sigma", "lamda", "gamma", # typically don't change
+    ]:
+        if param in params_to_vary:
+            param_values[param] = kwargs[param] # a list
+        else:
+            param_values[param] = [kwargs[param+"_default"]] # 1-element list
+    
+    all_param_configs = [dict(zip(param_values.keys(), x)) for x in itertools.product(*param_values.values())]
+
+    for param_config in all_param_configs:
+        path = "../results/US"
+        for param in [
+            "pop_size", "init_prev", "num_groups", "pool_size", "horizon", 
+            "beta", "sigma", "lamda", "gamma"
+        ]:
+            path += f"_{param}={param_config[param]}"
+        path += "/"
+        param_config["output_path"] = path
+
+    with Pool() as pool:
+        pool.starmap(
+            run_simulation_wrapper, 
+            [(seed, param_config) for seed in range(num_seeds) for param_config in all_param_configs]
+        )
