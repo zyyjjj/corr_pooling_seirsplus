@@ -10,7 +10,7 @@ PCR_PARAMS = {
     "xi": 1 / 2,
     "c_2": 1,
     # limit of detection
-    "LoD": 100,
+    "LoD": 174,
 }
 
 
