@@ -79,6 +79,7 @@ def run_simulation(
         gamma=gamma,
         initE=init_exposed,
         seed=seed,
+        transition_mode="time_in_state"
     )
 
     # initiate simulation runner
@@ -91,6 +92,7 @@ def run_simulation(
         seed=seed,
         output_path=output_path,
         save_results=save_results,
+        max_dt=0.01
     )
 
     # run simulation
