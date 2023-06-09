@@ -25,6 +25,7 @@ class SimulationRunner:
         T: int,
         num_groups: int,
         pool_size: int,
+        LoD: int,
         seed: int,
         save_results: bool = True,
         output_path: Optional[str] = None,
@@ -60,6 +61,7 @@ class SimulationRunner:
         self.max_dt = max_dt
         self.num_groups = num_groups
         self.pool_size = pool_size
+        self.LoD = LoD
         self.screening_groups = self.get_groups(
             graph=self.model.G,
             cluster_size=math.ceil(self.model.numNodes / self.num_groups),
@@ -167,7 +169,17 @@ class SimulationRunner:
         viral_loads = [
             [int(10 ** self.model.current_VL[x]) for x in pool] for pool in pools
         ]
-        group_testing = OneStageGroupTesting(ids=pools, viral_loads=viral_loads)
+        group_testing = OneStageGroupTesting(
+            ids=pools, 
+            viral_loads=viral_loads,
+            pcr_params={
+                "V_sample": 1,
+                "c_1": 1/10,
+                "xi": 1/2,
+                "c_2": 1,
+                "LoD": self.LoD
+            }
+        )
         test_results, diagnostics = group_testing.run_one_stage_group_testing()
 
         # pass test_results to update isolation status in self.model
@@ -205,6 +217,11 @@ class SimulationRunner:
             + self.model.numH[self.model.tidx]
         )
         performance["mean_num_positives_in_positive_pool"] = np.mean(diagnostics["num_positives_per_positive_pool"])
+        if diagnostics["num_positives"] > 0:
+            performance["daily_sensitivity"] = diagnostics["num_identified"] / diagnostics["num_positives"]
+        else:
+            performance["daily_sensitivity"] = float("nan")
+
 
         self.overall_results.append(performance)
 

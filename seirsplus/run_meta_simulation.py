@@ -25,6 +25,7 @@ def run_simulation(
     horizon: int,
     num_groups: int,
     pool_size: int,
+    LoD: int,
     beta: float,
     sigma: float,
     lamda: float,
@@ -43,7 +44,8 @@ def run_simulation(
         horizon: The time horizon of the simulation.
         num_groups: Number of screening groups to split the population into.
         pool_size: Size of the pooled tests in one-stage group testing.
-        beta, sigma, lamda, gamma: The parameters of the SEIR+ model.
+        LoD: The limit of detection of the PCR test.
+        beta, sigma, lamda, gamma: The parameters of the SEIRS+ model.
         pooling_strategy: The pooling strategy to use. Must be one of "naive"
             and "correlated".
         output_path: The directory to save the simulation results to.
@@ -89,6 +91,7 @@ def run_simulation(
         T=horizon,
         num_groups=num_groups,
         pool_size=pool_size,
+        LoD=LoD,
         seed=seed,
         output_path=output_path,
         save_results=save_results,
@@ -131,7 +134,7 @@ if __name__ == "__main__":
     param_values = {}
 
     for param in [
-        "init_prev", "num_groups", "pool_size",
+        "init_prev", "num_groups", "pool_size", "LoD",
         "pop_size", "horizon", "beta", "sigma", "lamda", "gamma", # typically don't change
     ]:
         if param in params_to_vary:
@@ -145,7 +148,7 @@ if __name__ == "__main__":
         path = "../results/US"
         for param in [
             "pop_size", "init_prev", "num_groups", "pool_size", "horizon", 
-            "beta", "sigma", "lamda", "gamma"
+            "beta", "sigma", "lamda", "gamma", "LoD"
         ]:
             path += f"_{param}={param_config[param]}"
         path += "/"
