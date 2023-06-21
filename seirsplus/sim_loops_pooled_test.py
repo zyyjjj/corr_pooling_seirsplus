@@ -7,6 +7,7 @@ import pickle
 import random
 import time
 from typing import Any, Dict, Optional
+import copy
 
 import numpy as np
 from networkx import Graph
@@ -57,13 +58,22 @@ class SimulationRunner:
 
         # simulation setup
         self.model = model
+
+        G_weighted = copy.deepcopy(model.G)
+        for e in G_weighted.edges():
+            if "weight" not in G_weighted[e[0]][e[1]]:
+                G_weighted[e[0]][e[1]]["weight"] = 10**10
+        self.model.G_weighted = G_weighted
+
         self.T = T
         self.max_dt = max_dt
         self.num_groups = num_groups
         self.pool_size = pool_size
         self.LoD = LoD
+        # TODO: pass in self.model.G_weighted
         self.screening_groups = self.get_groups(
-            graph=self.model.G,
+            # graph=self.model.G,
+            graph=self.model.G_weighted,
             cluster_size=math.ceil(self.model.numNodes / self.num_groups),
         )
         if pooling_strategy not in ["naive", "correlated"]:
@@ -156,7 +166,8 @@ class SimulationRunner:
         # store pooling result and viral loads in nested lists
         if self.pooling_strategy == "correlated":
             pools = self.get_groups(
-                graph=self.model.G.subgraph(screening_group),
+                # graph=self.model.G.subgraph(screening_group), # TODO: self.model.G_weighted.subgraph(screening_group)
+                self.model.G_weighted.subgraph(screening_group),
                 cluster_size=self.pool_size,
             )
             pools = [v for _, v in pools.items()]  # a list of lists
@@ -182,12 +193,22 @@ class SimulationRunner:
         )
         test_results, diagnostics = group_testing.run_one_stage_group_testing()
 
+        num_susceptible_neighbors_of_identified = 0
+        num_susceptible_neighbors_of_unidentified = 0
+
         # pass test_results to update isolation status in self.model
         for pool_idx, pool in enumerate(pools):
             for individual_idx, individual in enumerate(pool):
+                # get the number of susceptible neighbors
+                neighbors = list(self.model.G[individual].keys())
+                num_susceptible_neighbors = sum(self.model.X[nb]==1 for nb in neighbors)
                 if test_results[pool_idx][individual_idx] == 1:
                     self.model.set_positive(individual, True)
                     self.model.set_isolation(individual, True)
+                    num_susceptible_neighbors_of_identified += num_susceptible_neighbors
+                else:
+                    if viral_loads[pool_idx][individual_idx] > 0:
+                        num_susceptible_neighbors_of_unidentified += num_susceptible_neighbors
 
         self.daily_results.append(diagnostics)
 
@@ -195,7 +216,9 @@ class SimulationRunner:
             self.get_cumulative_test_performance()
         )  # cumulative test performance
         performance["day"] = dayOfNextIntervention
-        performance["cumRecovered"] = self.model.total_num_recovered(self.model.tidx)
+        # performance["cumRecovered"] = self.model.total_num_recovered(self.model.tidx)
+        performance["cumRecovered"] = self.model.numR[self.model.tidx] \
+            + self.model.numQ_R[self.model.tidx]
         performance["cumInfections"] = (
             self.model.numR[self.model.tidx]
             + self.model.numQ_R[self.model.tidx]
@@ -209,12 +232,18 @@ class SimulationRunner:
             + self.model.numQ_sym[self.model.tidx]
             + self.model.numQ_asym[self.model.tidx]
         )
-        performance["cumActiveInfections"] = (
+        performance["numActiveInfections"] = (
             self.model.numE[self.model.tidx]
             + self.model.numI_pre[self.model.tidx]
             + self.model.numI_sym[self.model.tidx]
             + self.model.numI_asym[self.model.tidx]
             + self.model.numH[self.model.tidx]
+        )
+        performance["numQuarantinedInfections"] = (
+            self.model.numQ_E[self.model.tidx]
+            + self.model.numQ_pre[self.model.tidx]
+            + self.model.numQ_sym[self.model.tidx]
+            + self.model.numQ_asym[self.model.tidx]
         )
         performance["mean_num_positives_in_positive_pool"] = np.mean(diagnostics["num_positives_per_positive_pool"])
         if diagnostics["num_positives"] > 0:
@@ -222,6 +251,8 @@ class SimulationRunner:
         else:
             performance["daily_sensitivity"] = float("nan")
 
+        performance["num_susceptible_neighbors_of_identified_positives"] = num_susceptible_neighbors_of_identified
+        performance["num_susceptible_neighbors_of_unidentified_positives"] = num_susceptible_neighbors_of_unidentified
 
         self.overall_results.append(performance)
 
