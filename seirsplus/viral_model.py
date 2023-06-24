@@ -1,5 +1,5 @@
 from typing import List
-
+from collections import defaultdict
 import numpy
 
 from seirsplus.models import ExtSEIRSNetworkModel
@@ -45,7 +45,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             transition from being updated by the SimulationRunner.
     """
 
-    def __init__(self, G, beta, sigma, lamda, gamma, 
+    def __init__(self, G, beta, sigma, lamda, gamma, households_dict,
                     VL_params = VL_PARAMS,
                     gamma_asym=None, eta=0, gamma_H=None, mu_H=0, alpha=1.0, xi=0, mu_0=0, nu=0, a=0, h=0, f=0, p=0,             
                     beta_local=None, beta_asym=None, beta_asym_local=None, beta_pairwise_mode='infected', delta=None, delta_pairwise_mode=None,
@@ -69,6 +69,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                     transition_mode=transition_mode, node_groups=node_groups, store_Xseries=store_Xseries, seed=seed)
         
         self.transitionNode = None 
+
+        self.households_dict = households_dict
 
         self.current_VL = -numpy.ones(self.numNodes)
         self.VL_params = VL_params
@@ -112,6 +114,9 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         self.initialize_VL()
 
         self.verbose = verbose
+
+        self.sec_infs_household = defaultdict(int)
+        self.sec_infs_non_household = defaultdict(int)
 
                     
     def save_VL_timeseries(self):
@@ -184,10 +189,50 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 elif sample_time < end_tail_time:
                     vl = tail_height
                 else:
+                    # print(f"self.t: {self.t}, self.infection_start_times[node]: {self.infection_start_times[node]}, sample_time: {sample_time}")
+                    # print(f"start_peak_time: {start_peak_time}, end_peak_time: {end_peak_time}, start_tail_time: {start_tail_time}, end_tail_time: {end_tail_time}")
                     vl = -1
                 
                 self.current_VL[node] = vl
+
+
+    def assign_infector_credit(self, infected):
+
+        neighbors = list(self.G._adj[infected].keys())
+        household_neighbors = set(self.households_dict[infected]) - set([infected])
+        non_household_neighbors = list(set(neighbors) - set(household_neighbors))
+
+        print(f"infected: {infected}, transmissionTerms_I: {self.transmissionTerms_I[infected]}, household_neighbors: {household_neighbors}, non_household_neighbors: {non_household_neighbors}")
+        print(f"Household member states: {[self.X[j] for j in household_neighbors]}")
+        print(f"Non-household member states: {[self.X[j] for j in non_household_neighbors]}")
+
+
+        if len(neighbors) == 0:
+            return
         
+        total_contribution = {}
+        total_contribution_Q = {}
+        
+        for j in household_neighbors:
+            if self.X[j] in (self.I_pre, self.I_sym, self.I_asym):
+                contribution = self.A[infected, j]**2 * self.beta[j] / self.transmissionTerms_I[infected]
+                self.sec_infs_household[j] += contribution.item()
+                total_contribution[j] = (contribution.item())
+            elif self.X[j] in (self.Q_pre, self.Q_sym, self.Q_asym):
+                contribution = self.A[infected, j]**2 * self.beta[j] / self.transmissionTerms_Q[infected]
+                total_contribution_Q[j] = (contribution.item())
+        
+        for j in non_household_neighbors:
+            if self.X[j] in (self.I_pre, self.I_sym, self.I_asym):
+                contribution = self.A[infected, j]**2 * self.beta[j] / self.transmissionTerms_I[infected]
+                self.sec_infs_non_household[j] += contribution.item()
+                total_contribution[j] = (contribution.item())
+            elif self.X[j] in (self.Q_pre, self.Q_sym, self.Q_asym):
+                contribution = self.A[infected, j]**2 * self.beta[j] / self.transmissionTerms_Q[infected]
+                total_contribution_Q[j] = (contribution.item())
+        
+        print(f"Infected node {infected} got contribution from infectious contacts {total_contribution} and quarantined contacts {total_contribution_Q}")
+
 
     def run_iteration(self, max_dt=None):
         r"""
@@ -220,10 +265,10 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         propensities, transitionTypes = self.calc_propensities()
 
-        if self.verbose >= 1:
+        if self.verbose >= 2:
             print("calling model.run_iteration(), time: ", self.t)
 
-        if self.verbose==2:
+        if self.verbose >= 2:
             print("    Nodes with transition propensities:")
             for i, prop in enumerate(propensities):
                 if sum(prop)>0:
@@ -237,7 +282,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         if(propensities.sum() > 0): # NOTE: transition only happens if someone has the propensity to do so, not according to discrete time steps
 
-            if self.verbose >= 1:
+            if self.verbose >= 2:
                 print("    propensities sum to >0")
 
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -251,7 +296,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             # Compute the time until the next event takes place
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             tau = (1/alpha)*numpy.log(float(1/r1)) # convert uniform to exponential RV
-            if self.verbose >= 1:
+            if self.verbose >= 2:
                 print("    tau: ", tau)
 
             # print(f"Before transition time update, self.t: {self.t}, tau: {tau}")
@@ -285,6 +330,39 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             # save the node currently undergoing a transition, to lock when running screening
             self.transitionNode = transitionNode 
 
+            if self.verbose >= 1:
+                print("    Nodes with transition propensities:")
+                for i, prop in enumerate(propensities):
+                    if i == transitionNode:
+                        p_list = []
+                        for i_p, p in enumerate(prop):
+                            if p>0:
+                                p_list.append((transitionTypes[i_p], p))
+                        print(f"        node{i}, in state {self.X[i]}, propensity {p_list}")
+                    
+
+            if self.verbose >= 1:
+                if transitionType in ("EtoIPRE", "QEtoQPRE"):
+                    print(f"-- node {transitionNode} is transitioning {transitionType} at time {self.t} with timer_state: {self.timer_state[transitionNode]}; 1/sigma: {1.0/self.sigma[transitionNode]}; VL: {self.current_VL[transitionNode]}")
+                    if self.timer_state[transitionNode] < 1.0/self.sigma[transitionNode]:
+                        print(f"** ERROR01: timer_state is less than 1/sigma for node {self.transitionNode} at time {self.t} for transition {transitionType}")
+                        # print(f"propensity: {propensities[transitionNode, transitionTypes.index(transitionType)]}, sum of all propensities: {alpha}")
+                if transitionType in ("IPREtoISYM", "IPREtoIASYM", "QPREtoQSYM", "QPREtoQASYM"):
+                    print(f"-- node {transitionNode} is transitioning {transitionType} at time {self.t} with timer_state: {self.timer_state[transitionNode]}; 1/lamda: {1.0/self.lamda[transitionNode]}; VL: {self.current_VL[transitionNode]}")
+                    if self.timer_state[transitionNode] < 1.0/self.lamda[transitionNode]:
+                        print(f"** ERROR01: timer_state is less than 1/lamda for node {self.transitionNode} at time {self.t} for transition {transitionType}")
+                        # print(f"propensity: {propensities[transitionNode, transitionTypes.index(transitionType)]}, sum of all propensities: {alpha}")
+                if transitionType in ("ISYMtoR", "QSYMtoR"):
+                    print(f"-- node {transitionNode} is transitioning {transitionType} at time {self.t} with timer_state: {self.timer_state[transitionNode]}; 1/gamma: {1.0/self.gamma[transitionNode]}; VL: {self.current_VL[transitionNode]}")
+                    if self.timer_state[transitionNode] < 1.0/self.gamma[transitionNode]:
+                        print(f"** ERROR01: timer_state is less than 1/gamma for node {self.transitionNode} at time {self.t} for transition {transitionType}")
+                        # print(f"propensity: {propensities[transitionNode, transitionTypes.index(transitionType)]}, sum of all propensities: {alpha}")
+                    if self.current_VL[self.transitionNode] < 0:
+                        if self.symptomatic_by_node[self.transitionNode]:
+                            print(f"** ERROR02: VL is negative for node {self.transitionNode} at time {self.t} for transition {transitionType}, current timer_state: {self.timer_state[self.transitionNode]}, current VL: {self.current_VL[self.transitionNode]}")
+                        # print(f"** ERROR02: VL is negative for node {self.transitionNode} at time {self.t} for transition {transitionType}, current timer_state: {self.timer_state[self.transitionNode]}")
+
+
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Perform updates triggered by rate propensities:
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -314,11 +392,15 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                                             'infected_node':                transitionNode,
                                             'infection_type':               transitionType,
                                             'infected_node_degree':         self.degree[transitionNode],
-                                            'local_contact_nodes':          transitionNode_GNbrs,
-                                            'local_contact_node_states':    self.X[transitionNode_GNbrs].flatten(),
-                                            'isolation_contact_nodes':      transitionNode_GQNbrs,
-                                            'isolation_contact_node_states':self.X[transitionNode_GQNbrs].flatten() })
+                                            'household_members':            self.households_dict[transitionNode],
+                                            'household_members_states':     self.X[self.households_dict[transitionNode]].flatten()
+                                            # 'local_contact_nodes':          transitionNode_GNbrs,
+                                            # 'local_contact_node_states':    self.X[transitionNode_GNbrs].flatten(),
+                                            # 'isolation_contact_nodes':      transitionNode_GQNbrs,
+                                            # 'isolation_contact_node_states':self.X[transitionNode_GQNbrs].flatten() 
+                                        })
                 self.infection_start_times[transitionNode] = self.t
+                self.assign_infector_credit(transitionNode)
             if transitionType in ("IPREtoISYM", "IPREtoIASYM", "QPREtoQSYM", "QPREtoQASYM"):
                 self.peak_VLs.append(self.current_VL[transitionNode])
 
@@ -328,7 +410,10 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 self.set_positive(node=transitionNode, positive=True)
             
             transition_info_tmp = {"t": self.t, "transitionNode": self.transitionNode, "transitionNodeVL": self.current_VL[self.transitionNode], "transitionType": transitionType}
-            print(transition_info_tmp)
+            if self.verbose >= 1:
+                print(transition_info_tmp)
+                print(f"propensity: {propensities[transitionNode, transitionTypes.index(transitionType)]}, sum of all propensities: {alpha}")
+
             self.transitions_log.append(transition_info_tmp)
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
