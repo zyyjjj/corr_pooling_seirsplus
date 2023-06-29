@@ -5,22 +5,41 @@ import numpy
 from seirsplus.models import ExtSEIRSNetworkModel
 
 # range for uniform sampling of key parameters for temporal VL progression
+# VL_PARAMS = {
+#     "symptomatic": {
+#         "start_peak": (1, 3), # I_pre
+#         "end_peak": (4, 6), # I_sym
+#         "start_tail": (11.5, 13.5), # I_sym
+#         "end_tail": (15, 17), # R
+#         "peak_height": (7.5, 10),
+#         "tail_height": (3.5, 6)
+#     },
+#     "asymptomatic": {
+#         "start_peak": (1, 3), # I_pre
+#         "end_peak": (4, 6), # I_asym
+#         "start_tail": (11, 11), # I_asym
+#         "end_tail": (11, 11), # R
+#         "peak_height": (5, 7),
+#         "tail_height": (3, 3.5)
+#     }
+# }
+
 VL_PARAMS = {
     "symptomatic": {
-        "start_peak": (1, 3), # I_pre
-        "end_peak": (4, 6), # I_sym
-        "start_tail": (11.5, 13.5), # I_sym
-        "end_tail": (15, 17), # R
-        "peak_height": (7.5, 10),
-        "tail_height": (3.5, 6)
+        "start_peak": (1, 1), # I_pre
+        "end_peak": (4, 4), # I_sym
+        "start_tail": (11, 1), # I_sym
+        "end_tail": (15, 15), # R
+        "peak_height": (4, 4),
+        "tail_height": (1, 1)
     },
     "asymptomatic": {
-        "start_peak": (1, 3), # I_pre
-        "end_peak": (4, 6), # I_asym
-        "start_tail": (11, 11), # I_asym
-        "end_tail": (11, 11), # R
-        "peak_height": (5, 7),
-        "tail_height": (3, 3.5)
+        "start_peak": (1, 1), # I_pre
+        "end_peak": (4, 4), # I_sym
+        "start_tail": (11, 1), # I_sym
+        "end_tail": (15, 15), # R
+        "peak_height": (4, 4),
+        "tail_height": (1, 1)
     }
 }
 
@@ -45,7 +64,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             transition from being updated by the SimulationRunner.
     """
 
-    def __init__(self, G, beta, sigma, lamda, gamma, households_dict,
+    def __init__(self, G, G_weighted, beta, sigma, lamda, gamma, households_dict,
                     VL_params = VL_PARAMS,
                     gamma_asym=None, eta=0, gamma_H=None, mu_H=0, alpha=1.0, xi=0, mu_0=0, nu=0, a=0, h=0, f=0, p=0,             
                     beta_local=None, beta_asym=None, beta_asym_local=None, beta_pairwise_mode='infected', delta=None, delta_pairwise_mode=None,
@@ -70,6 +89,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         
         self.transitionNode = None 
 
+        self.G_weighted = G_weighted
         self.households_dict = households_dict
 
         self.current_VL = -numpy.ones(self.numNodes)
@@ -202,7 +222,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         household_neighbors = set(self.households_dict[infected]) - set([infected])
         non_household_neighbors = list(set(neighbors) - set(household_neighbors))
 
-        print(f"infected: {infected}, transmissionTerms_I: {self.transmissionTerms_I[infected]}, household_neighbors: {household_neighbors}, non_household_neighbors: {non_household_neighbors}")
+        print(f"infected: {infected}, transmissionTerms_I: {self.transmissionTerms_I[infected]}, transmissionTerms_Q: {self.transmissionTerms_Q[infected]}, household_neighbors: {household_neighbors}, non_household_neighbors: {non_household_neighbors}")
         print(f"Household member states: {[self.X[j] for j in household_neighbors]}")
         print(f"Non-household member states: {[self.X[j] for j in non_household_neighbors]}")
 
@@ -219,7 +239,9 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 self.sec_infs_household[j] += contribution.item()
                 total_contribution[j] = (contribution.item())
             elif self.X[j] in (self.Q_pre, self.Q_sym, self.Q_asym):
-                contribution = self.A[infected, j]**2 * self.beta[j] / self.transmissionTerms_Q[infected]
+                contribution = self.A[infected, j]**2 * numpy.divide(
+                    self.beta_Q[j], self.transmissionTerms_Q[infected], 
+                    out=numpy.array([0.]), where=self.transmissionTerms_Q[infected]!=0)
                 total_contribution_Q[j] = (contribution.item())
         
         for j in non_household_neighbors:
@@ -228,7 +250,9 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 self.sec_infs_non_household[j] += contribution.item()
                 total_contribution[j] = (contribution.item())
             elif self.X[j] in (self.Q_pre, self.Q_sym, self.Q_asym):
-                contribution = self.A[infected, j]**2 * self.beta[j] / self.transmissionTerms_Q[infected]
+                contribution = self.A[infected, j]**2 * numpy.divide(
+                    self.beta_Q[j], self.transmissionTerms_Q[infected], 
+                    out=numpy.array([0.]), where=self.transmissionTerms_Q[infected]!=0)
                 total_contribution_Q[j] = (contribution.item())
         
         print(f"Infected node {infected} got contribution from infectious contacts {total_contribution} and quarantined contacts {total_contribution_Q}")

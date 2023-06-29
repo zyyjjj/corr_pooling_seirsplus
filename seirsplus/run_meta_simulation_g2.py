@@ -40,6 +40,7 @@ def run_simulation(
     edge_weight: float,
     alpha: float,
     pooling_strategy: str,
+    country: str = "US",
     output_path: Optional[str] = None,
     save_results: Optional[bool] = True,
     **kwargs,
@@ -59,6 +60,7 @@ def run_simulation(
         alpha: Susceptibility multiplier.
         pooling_strategy: The pooling strategy to use. Must be one of "naive"
             and "correlated".
+        country: Country whose household size distribution we use.
         output_path: The directory to save the simulation results to.
         save_results: Whether to save the simulation results, default True.
 
@@ -72,14 +74,20 @@ def run_simulation(
     # generate social network graph
     demographic_graphs, _, households = generate_demographic_contact_network(
         N=pop_size,
-        demographic_data=household_country_data("US"),
+        demographic_data=household_country_data(country),
         distancing_scales=[0.7],
         isolation_groups=[],
     )
+
     G = demographic_graphs["baseline"]
+    G_weighted = copy.deepcopy(G)
     for e in G.edges():
         if "weight" not in G[e[0]][e[1]]:
             G[e[0]][e[1]]["weight"] = edge_weight
+    for e in G_weighted.edges():
+        if "weight" not in G_weighted[e[0]][e[1]]:
+            G_weighted[e[0]][e[1]]["weight"] = 10**10
+
     households_dict = {}
     for household in households:
         for node_id in household["indices"]:
@@ -89,8 +97,10 @@ def run_simulation(
     init_exposed = int(init_prev * pop_size)
     model = ViralExtSEIRNetworkModel(
         G=G,
+        G_weighted=G_weighted,
         households_dict=households_dict,
         beta=beta,
+        beta_Q=0,
         sigma=sigma,
         lamda=lamda,
         gamma=gamma,
@@ -135,6 +145,7 @@ def parse():
     parser.add_argument("--gamma", type = float, default = 0.25)
     parser.add_argument("--edge_weight", type = float, default = 1000)
     parser.add_argument("--alpha", type = float, default = 1.0)
+    parser.add_argument("--country", type = str, default = "US")
 
     args = parser.parse_args()
 
@@ -158,7 +169,7 @@ if __name__ == "__main__":
 
     args = vars(parse()) # convert namespace to dict
 
-    path = "../results/US"
+    path = "../results/" + args["country"]
     for param in [
         "pop_size", "init_prev", "num_groups", "pool_size", "horizon", 
         "beta", "sigma", "lamda", "gamma", "LoD", "edge_weight", "alpha"
