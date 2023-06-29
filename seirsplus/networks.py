@@ -169,6 +169,7 @@ def generate_demographic_contact_network(N, demographic_data, layer_generator='F
         
         household = {}
 
+        # print(f"householdSituations_prob: {householdSituations_prob}")
         household['situation'] = numpy.random.choice(list(householdSituations_prob.keys()), p=list(householdSituations_prob.values()))
 
         household['ageBrackets'] = []
@@ -367,6 +368,7 @@ def generate_demographic_contact_network(N, demographic_data, layer_generator='F
     # Count the number of individuals in each age bracket in the generated households:
     ageBrackets_numInPop = {ageBracket: numpy.sum([len([age for age in household['ageBrackets'] if age==ageBracket]) for household in households])
                             for ageBracket, __ in age_distn.items()}
+    print(ageBrackets_numInPop)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Generate a graph layer for each age group, representing the public contacts for each age group:
@@ -381,6 +383,7 @@ def generate_demographic_contact_network(N, demographic_data, layer_generator='F
         print("Generating graph for "+layerGroup+"...")
         
         layerInfo['numIndividuals'] = numpy.sum([ageBrackets_numInPop[ageBracket] for ageBracket in layerInfo['ageBrackets']])
+        # print("Number of individuals in this layer: "+str(layerInfo['numIndividuals']))
 
         layerInfo['indices']        = range(curidx, curidx+layerInfo['numIndividuals'])
         curidx                      += layerInfo['numIndividuals']
@@ -633,6 +636,63 @@ def household_country_data(country):
                                                 'pct_with_over60_givenSingleOccupant':       0.110,
                                                 'mean_num_under20_givenAtLeastOneUnder20':  1.91 }
                         }
+    
+    elif(country=='CN'):
+        household_data = {
+                            'household_size_distn':{ 1: 0.156, 
+                                                    2: 0.272, 
+                                                    3: 0.247,
+                                                    4: 0.171, 
+                                                    5: 0.089, 
+                                                    6: 0.065 },
+
+                            'age_distn':{'0-9':   0.121,
+                                                '10-19': 0.131,
+                                                '20-29': 0.137,
+                                                '30-39': 0.133,
+                                                '40-49': 0.124,
+                                                '50-59': 0.131,
+                                                '60-69': 0.115,
+                                                '70-79': 0.070,
+                                                '80+'  : 0.038  },
+
+                            'household_stats':{ 'pct_with_under20':          0.3368, 
+                                                'pct_with_over60':           0.3801,
+                                                'pct_with_under20_over60':  0.0341,
+                                                'pct_with_over60_givenSingleOccupant':       0.110,
+                                                'mean_num_under20_givenAtLeastOneUnder20':  1.91 }
+                        }
+
+    elif(country=='test10'):
+        household_data = {
+                            'household_size_distn':{
+                                1: 0.01,
+                                # 2: 0.01,
+                                # 3: 0.01,
+                                # 4: 0.01,
+                                # 5: 0.01,
+                                # 6: 0.01,
+                                # 7: 0.01,
+                                # 8: 0.01,
+                                # 9: 0.01,
+                                10: 0.99 },
+
+                            'age_distn':{'0-9':   0.35,
+                                                '10-19': 0.35,
+                                                '20-29': 0.05,
+                                                '30-39': 0.05,
+                                                '40-49': 0.05,
+                                                '50-59': 0.05,
+                                                '60-69': 0.05,
+                                                '70-79': 0.05,
+                                                '80+'  : 0  },
+
+                            'household_stats':{ 'pct_with_under20':          0.3368, 
+                                                'pct_with_over60':           0.3801,
+                                                'pct_with_under20_over60':  0.0341,
+                                                'pct_with_over60_givenSingleOccupant':       0.110,
+                                                'mean_num_under20_givenAtLeastOneUnder20':  1.91 }
+        }
 
     return household_data
 
@@ -693,10 +753,34 @@ def plot_degree_distn(graph, max_degree=None, show=True, use_seaborn=True):
 
 
 
+def generate_simplified_network(
+    N: int,
+    household_size: int,
+    p_random_edge: float
+):
+    """
+    Generate a simplified network with a fixed household size and random edges.
+    """
 
+    A = numpy.zeros((N, N))
+    households_dict = {}
 
+    # output network and household dict (node: household nodes)
+    for i in range(0, N, household_size):
+        A[i:i+household_size, i:i+household_size] = numpy.ones((household_size, household_size))
+        for j in range(i, i+household_size):
+            households_dict[j] = list(range(i, i+household_size))
 
+    # add random edges
+    for i in range(N):
+        for j in range(i+1, N):
+            if A[i, j] == 0 and numpy.random.rand() < p_random_edge:
+                A[i, j] = 1
+                A[j, i] = 1
 
+    G = networkx.from_numpy_matrix(A)
+
+    return G, households_dict
 
 
 
