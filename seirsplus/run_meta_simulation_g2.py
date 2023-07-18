@@ -24,6 +24,25 @@ from seirsplus.networks import (
 from seirsplus.sim_loops_pooled_test import SimulationRunner
 from seirsplus.viral_model import ViralExtSEIRNetworkModel
 
+VL_PARAMS = {
+    "symptomatic": {
+        "start_peak": (2.19, 5.26), 
+        "dt_peak": (1, 3), 
+        "dt_decay": (7, 10), 
+        "dt_tail": (5, 6), 
+        "peak_height": (7, 7),
+        "tail_height": (3, 3)
+    },
+    "asymptomatic": {
+        "start_peak": (2.19, 5.26), 
+        "dt_peak": (1, 3), 
+        "dt_decay": (7, 10), 
+        "dt_tail": (5, 6), 
+        "peak_height": (7, 7),
+        "tail_height": (3, 3)
+    }
+}
+
 
 def run_simulation(
     seed: int,
@@ -39,6 +58,7 @@ def run_simulation(
     gamma: float,
     edge_weight: float,
     alpha: float,
+    peak_VL: float, # TODO
     pooling_strategy: str,
     country: str = "US",
     output_path: Optional[str] = None,
@@ -93,19 +113,27 @@ def run_simulation(
         for node_id in household["indices"]:
             households_dict[node_id] = household["indices"]
 
-    # initiate SEIR+ model
-    init_exposed = int(init_prev * pop_size)
+    VL_params = copy.deepcopy(VL_PARAMS)
+    VL_params["symptomatic"]["peak_height"] = (peak_VL, peak_VL)
+    VL_params["asymptomatic"]["peak_height"] = (peak_VL, peak_VL)
+
+    # initiate SEIR+ model, separate initial infected among E and I_pre
+    init_E = int(init_prev * pop_size)//2
+    init_Ipre = int(init_prev * pop_size)//2
+
     model = ViralExtSEIRNetworkModel(
         G=G,
         G_weighted=G_weighted,
         households_dict=households_dict,
+        VL_params=VL_params,
         beta=beta,
         beta_Q=0,
         sigma=sigma,
         lamda=lamda,
         gamma=gamma,
         alpha=alpha,
-        initE=init_exposed,
+        initE=init_E,
+        initI_pre=init_Ipre,
         seed=seed,
         transition_mode="time_in_state"
     )
@@ -143,9 +171,10 @@ def parse():
     parser.add_argument("--sigma", type = float, default = 0.2)
     parser.add_argument("--lamda", type = float, default = 0.5)
     parser.add_argument("--gamma", type = float, default = 0.25)
-    parser.add_argument("--edge_weight", type = float, default = 1000)
+    parser.add_argument("--edge_weight", type = int, default = 1000)
     parser.add_argument("--alpha", type = float, default = 1.0)
     parser.add_argument("--country", type = str, default = "US")
+    parser.add_argument("--peak_VL", type = float, default = 6) 
 
     args = parser.parse_args()
 
@@ -169,10 +198,10 @@ if __name__ == "__main__":
 
     args = vars(parse()) # convert namespace to dict
 
-    path = "../results/" + args["country"]
+    path = "../../results/" + args["country"]
     for param in [
         "pop_size", "init_prev", "num_groups", "pool_size", "horizon", 
-        "beta", "sigma", "lamda", "gamma", "LoD", "edge_weight", "alpha"
+        "beta", "sigma", "lamda", "gamma", "LoD", "edge_weight", "alpha", "peak_VL"
     ]:
         path += f"_{param}={args[param]}"
     path += "/"

@@ -59,20 +59,12 @@ class SimulationRunner:
         # simulation setup
         self.model = model
 
-        G_weighted = copy.deepcopy(model.G)
-        for e in G_weighted.edges():
-            if "weight" not in G_weighted[e[0]][e[1]]:
-                G_weighted[e[0]][e[1]]["weight"] = 10**10
-        self.model.G_weighted = G_weighted
-
         self.T = T
         self.max_dt = max_dt
         self.num_groups = num_groups
         self.pool_size = pool_size
         self.LoD = LoD
-        # TODO: pass in self.model.G_weighted
         self.screening_groups = self.get_groups(
-            # graph=self.model.G,
             graph=self.model.G_weighted,
             cluster_size=math.ceil(self.model.numNodes / self.num_groups),
         )
@@ -162,11 +154,13 @@ class SimulationRunner:
             x for x in screening_group if nodeStates[x] not in self.isolation_states
         ]
 
+        np_random_state = np.random.get_state()
+        random_state = random.getstate()
+
         # divide individuals in screening group into pools according to pooling strategy
         # store pooling result and viral loads in nested lists
         if self.pooling_strategy == "correlated":
             pools = self.get_groups(
-                # graph=self.model.G.subgraph(screening_group), # TODO: self.model.G_weighted.subgraph(screening_group)
                 self.model.G_weighted.subgraph(screening_group),
                 cluster_size=self.pool_size,
             )
@@ -180,6 +174,9 @@ class SimulationRunner:
         viral_loads = [
             [int(10 ** self.model.current_VL[x]) for x in pool] for pool in pools
         ]
+        # print([viral_loads[x] for x in range(len(viral_loads)) if sum(viral_loads[x]) > 0])
+        print("Viral loads in positive pools: ", [
+            [self.model.current_VL[x] for x in pool if self.model.current_VL[x]>0] for pool,vl in zip(pools,viral_loads) if max(vl)>0])
         group_testing = OneStageGroupTesting(
             ids=pools, 
             viral_loads=viral_loads,
@@ -192,6 +189,9 @@ class SimulationRunner:
             }
         )
         test_results, diagnostics = group_testing.run_one_stage_group_testing()
+
+        np.random.set_state(np_random_state)
+        random.setstate(random_state)
 
         num_susceptible_neighbors_of_identified = 0
         num_susceptible_neighbors_of_unidentified = 0
