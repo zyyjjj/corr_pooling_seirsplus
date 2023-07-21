@@ -1,6 +1,7 @@
 from __future__ import division
 import numpy
 import scipy
+from collections import defaultdict
 import networkx
 from . import FARZ
 from .models import *
@@ -783,7 +784,36 @@ def generate_simplified_network(
     return G, households_dict
 
 
+def generate_simplified_network_community(
+    N: int,
+    household_size: int,
+    community_size: int,
+    p_random_edge: float
+):
+    """
+    Generate a simplified network with a fixed household and community size.
+    Members within a household are all connected.
+    Non-household members within a community are connected with probability p_random_edges.
+    Constraints: N % community_size = 0; community_size % household_size = 0.
+    """
 
+    A = numpy.zeros((N, N))
+    households_dict = {}
+    community_edges_dict = defaultdict(list)
 
+    for comm_id in range(0, N, community_size):
+        for i in range(comm_id, comm_id+community_size, household_size):
+            A[i:i+household_size, i:i+household_size] = numpy.ones((household_size, household_size))
+            for j in range(i, i+household_size):
+                households_dict[j] = list(range(i, i+household_size))
+        for i in range(comm_id, comm_id+community_size):
+            for j in range(i+1, comm_id+community_size):
+                if A[i, j] == 0 and numpy.random.rand() < p_random_edge:
+                    A[i, j] = 1
+                    A[j, i] = 1
+                    community_edges_dict[i].append(j)
+                    community_edges_dict[j].append(i)
 
+    G = networkx.from_numpy_matrix(A)
 
+    return G, households_dict, dict(community_edges_dict)
