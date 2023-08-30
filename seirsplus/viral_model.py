@@ -11,37 +11,66 @@ from seirsplus.models import ExtSEIRSNetworkModel
 #         "end_peak": (4, 6), # I_sym
 #         "start_tail": (11.5, 13.5), # I_sym
 #         "end_tail": (15, 17), # R
-#         "peak_height": (7.5, 10),
-#         "tail_height": (3.5, 6)
+#         # "peak_height": (7.5, 10),
+#         # "tail_height": (3.5, 6)
+#         "peak_height": (7, 7),
+#         "tail_height": (3, 3.5)
 #     },
 #     "asymptomatic": {
 #         "start_peak": (1, 3), # I_pre
 #         "end_peak": (4, 6), # I_asym
 #         "start_tail": (11, 11), # I_asym
 #         "end_tail": (11, 11), # R
-#         "peak_height": (5, 7),
+#         # "peak_height": (5, 7),
+#         # "tail_height": (3, 3.5)
+#         "peak_height": (7, 7),
 #         "tail_height": (3, 3.5)
 #     }
 # }
 
 VL_PARAMS = {
     "symptomatic": {
-        "start_peak": (1, 1), # I_pre
-        "end_peak": (4, 4), # I_sym
-        "start_tail": (11, 1), # I_sym
-        "end_tail": (15, 15), # R
-        "peak_height": (4, 4),
-        "tail_height": (1, 1)
+        "start_peak": (2.19, 5.26), 
+        "dt_peak": (1, 3), 
+        "dt_decay": (7, 10), 
+        "dt_tail": (5, 6), 
+        "peak_height": (7, 7),
+        # "tail_height": (4, 4)
+        # "peak_height": (6.5, 6.5),
+        "tail_height": (3, 3)
     },
     "asymptomatic": {
-        "start_peak": (1, 1), # I_pre
-        "end_peak": (4, 4), # I_sym
-        "start_tail": (11, 1), # I_sym
-        "end_tail": (15, 15), # R
-        "peak_height": (4, 4),
-        "tail_height": (1, 1)
+        "start_peak": (2.19, 5.26), 
+        "dt_peak": (1, 3), 
+        "dt_decay": (7, 10), 
+        "dt_tail": (5, 6), 
+        "peak_height": (7, 7),
+        # "tail_height": (4, 4)
+        # "peak_height": (6.5, 6.5),
+        "tail_height": (3, 3)
     }
 }
+
+# VL_PARAMS = {
+#     "symptomatic": {
+#         "start_peak": (1, 1), # I_pre
+#         "end_peak": (10, 10), # I_sym
+#         "start_tail": (11, 11), # I_sym
+#         "end_tail": (15, 15), # R
+#         # "peak_height": (3, 5),
+#         "peak_height": (4,6), 
+#         "tail_height": (-1, -1)
+#     },
+#     "asymptomatic": {
+#         "start_peak": (1, 1), # I_pre
+#         "end_peak": (10, 10), # I_sym
+#         "start_tail": (11, 11), # I_sym
+#         "end_tail": (15, 15), # R
+#         # "peak_height": (3, 5),
+#         "peak_height": (4,6), 
+#         "tail_height": (-1, -1)
+#     }
+# }
 
 
 class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
@@ -115,6 +144,9 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             key = "symptomatic" if self.symptomatic_by_node[node] else "asymptomatic"
             critical_time_points = [numpy.random.uniform(bounds[0], bounds[1])
                     for bounds in list(self.VL_params[key].values())[:4]]
+            # if we are sampling time intervals rather than time points, convert to time points
+            for i in range(1,4):
+                critical_time_points[i] += critical_time_points[i-1]
             peak_plateau_height = numpy.random.uniform(
                 self.VL_params[key]["peak_height"][0], self.VL_params[key]["peak_height"][1]
             )
@@ -237,23 +269,23 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
             if self.X[j] in (self.I_pre, self.I_sym, self.I_asym):
                 contribution = self.A[infected, j]**2 * self.beta[j] / self.transmissionTerms_I[infected]
                 self.sec_infs_household[j] += contribution.item()
-                total_contribution[j] = (contribution.item())
+                total_contribution[j] = round(contribution.item(), 3)
             elif self.X[j] in (self.Q_pre, self.Q_sym, self.Q_asym):
                 contribution = self.A[infected, j]**2 * numpy.divide(
                     self.beta_Q[j], self.transmissionTerms_Q[infected], 
                     out=numpy.array([0.]), where=self.transmissionTerms_Q[infected]!=0)
-                total_contribution_Q[j] = (contribution.item())
+                total_contribution_Q[j] = round(contribution.item(), 3)
         
         for j in non_household_neighbors:
             if self.X[j] in (self.I_pre, self.I_sym, self.I_asym):
                 contribution = self.A[infected, j]**2 * self.beta[j] / self.transmissionTerms_I[infected]
                 self.sec_infs_non_household[j] += contribution.item()
-                total_contribution[j] = (contribution.item())
+                total_contribution[j] = round(contribution.item(), 3)
             elif self.X[j] in (self.Q_pre, self.Q_sym, self.Q_asym):
                 contribution = self.A[infected, j]**2 * numpy.divide(
                     self.beta_Q[j], self.transmissionTerms_Q[infected], 
                     out=numpy.array([0.]), where=self.transmissionTerms_Q[infected]!=0)
-                total_contribution_Q[j] = (contribution.item())
+                total_contribution_Q[j] = round(contribution.item(), 3)
         
         print(f"Infected node {infected} got contribution from infectious contacts {total_contribution} and quarantined contacts {total_contribution_Q}")
 

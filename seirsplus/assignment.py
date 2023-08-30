@@ -46,6 +46,7 @@ def embed_nodes(
     return model.wv.vectors, model
 
 
+# https://stackoverflow.com/questions/5452576/k-means-algorithm-variation-with-equal-cluster-size
 def get_equal_sized_clusters(
     X: np.ndarray,
     model: Word2Vec,

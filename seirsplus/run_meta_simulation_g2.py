@@ -58,7 +58,7 @@ def run_simulation(
     gamma: float,
     edge_weight: float,
     alpha: float,
-    peak_VL: float, # TODO
+    peak_VL: float, 
     pooling_strategy: str,
     country: str = "US",
     output_path: Optional[str] = None,
@@ -78,6 +78,7 @@ def run_simulation(
         beta, sigma, lamda, gamma: The parameters of the SEIRS+ model.
         edge_weight: Weight to assign to intra-household edges.
         alpha: Susceptibility multiplier.
+        peak_VL: Peak viral load.
         pooling_strategy: The pooling strategy to use. Must be one of "naive"
             and "correlated".
         country: Country whose household size distribution we use.
@@ -100,7 +101,7 @@ def run_simulation(
     )
 
     G = demographic_graphs["baseline"]
-    G_weighted = copy.deepcopy(G)
+    G_weighted = copy.deepcopy(G) # for assigning screening groups / pools
     for e in G.edges():
         if "weight" not in G[e[0]][e[1]]:
             G[e[0]][e[1]]["weight"] = edge_weight

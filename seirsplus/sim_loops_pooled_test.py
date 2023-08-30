@@ -31,7 +31,8 @@ class SimulationRunner:
         save_results: bool = True,
         output_path: Optional[str] = None,
         verbose: bool = False,
-        max_dt: Optional[float] = None
+        max_dt: Optional[float] = None,
+        community_size: int = None,
     ):
         r"""Initialize the simulation runner.
 
@@ -47,6 +48,7 @@ class SimulationRunner:
             max_dt: Maximum allowed time-between-transition; if time till next
                 transition exceeds max_dt, advance the model by max_dt without
                 executing any transition. If None, defaults to T. 
+            community_size: Size of the community, used in weak-correlation scenario.
 
         Returns:
             None.
@@ -63,12 +65,13 @@ class SimulationRunner:
         self.max_dt = max_dt
         self.num_groups = num_groups
         self.pool_size = pool_size
+        self.community_size = community_size if community_size else 5*self.pool_size
         self.LoD = LoD
         self.screening_groups = self.get_groups(
             graph=self.model.G_weighted,
             cluster_size=math.ceil(self.model.numNodes / self.num_groups),
         )
-        if pooling_strategy not in ["naive", "correlated"]:
+        if pooling_strategy not in ["naive", "correlated", "correlated_weak"]:
             raise NotImplementedError(
                 f"Pooling strategy {pooling_strategy} not implemented."
             )
@@ -165,6 +168,19 @@ class SimulationRunner:
                 cluster_size=self.pool_size,
             )
             pools = [v for _, v in pools.items()]  # a list of lists
+        elif self.pooling_strategy == "correlated_weak":
+            community_pools = self.get_groups(
+                self.model.G_weighted.subgraph(screening_group),
+                cluster_size=self.community_size
+            )
+            community_pools = [v for _, v in community_pools.items()]
+            pools = []
+            for community_pool in community_pools:
+                random.shuffle(community_pool)
+                pools += [
+                    community_pool[i : i + self.pool_size]
+                    for i in range(0, len(community_pool), self.pool_size)
+                ]                
         elif self.pooling_strategy == "naive":
             random.shuffle(screening_group)
             pools = [
@@ -246,11 +262,9 @@ class SimulationRunner:
             + self.model.numQ_asym[self.model.tidx]
         )
         performance["mean_num_positives_in_positive_pool"] = np.mean(diagnostics["num_positives_per_positive_pool"])
-        if diagnostics["num_positives"] > 0:
-            performance["daily_sensitivity"] = diagnostics["num_identified"] / diagnostics["num_positives"]
-        else:
-            performance["daily_sensitivity"] = float("nan")
-
+        performance["daily_sensitivity"] = np.divide(diagnostics["num_identified"], diagnostics["num_positives"])
+        performance["daily_effective_efficiency"] = np.divide(diagnostics["num_identified"], diagnostics["num_tests"])
+        performance["daily_effective_followup_efficiency"] = np.divide(diagnostics["num_identified"], (diagnostics["num_tests"] - len(test_results)))
         performance["num_susceptible_neighbors_of_identified_positives"] = num_susceptible_neighbors_of_identified
         performance["num_susceptible_neighbors_of_unidentified_positives"] = num_susceptible_neighbors_of_unidentified
 
