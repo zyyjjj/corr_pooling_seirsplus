@@ -30,7 +30,9 @@ from seirsplus.models import ExtSEIRSNetworkModel
 
 VL_PARAMS = {
     "symptomatic": {
-        "start_peak": (2.19, 5.26), 
+        # "start_peak": (2.19, 5.26),
+        "half_peak": (1,1),
+        "start_peak": (3,5),
         "dt_peak": (1, 3), 
         "dt_decay": (7, 10), 
         "dt_tail": (5, 6), 
@@ -40,7 +42,9 @@ VL_PARAMS = {
         "tail_height": (3, 3)
     },
     "asymptomatic": {
-        "start_peak": (2.19, 5.26), 
+        # "start_peak": (2.19, 5.26), 
+        "half_peak": (1,1),
+        "start_peak": (3,5),
         "dt_peak": (1, 3), 
         "dt_decay": (7, 10), 
         "dt_tail": (5, 6), 
@@ -133,6 +137,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
 
         # start time of infections; initialize as large numbers for those never infected
         self.infection_start_times = numpy.ones(self.numNodes)*100000
+        self.isolation_start_times = numpy.ones(self.numNodes)*100000
 
         # assign (a)symptomatic nodes; this is independent from built-in parameter `a`
         symptomatic_rv = numpy.random.rand(self.numNodes, 1)
@@ -143,9 +148,9 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         for node in range(self.numNodes):
             key = "symptomatic" if self.symptomatic_by_node[node] else "asymptomatic"
             critical_time_points = [numpy.random.uniform(bounds[0], bounds[1])
-                    for bounds in list(self.VL_params[key].values())[:4]]
+                    for bounds in list(self.VL_params[key].values())[:5]]
             # if we are sampling time intervals rather than time points, convert to time points
-            for i in range(1,4):
+            for i in range(1,5):
                 critical_time_points[i] += critical_time_points[i-1]
             peak_plateau_height = numpy.random.uniform(
                 self.VL_params[key]["peak_height"][0], self.VL_params[key]["peak_height"][1]
@@ -159,9 +164,9 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 "tail_height": tail_height
             }
             # update and override transition rate parameters
-            self.sigma[node] = 1 / critical_time_points[0]
-            self.lamda[node] = 1 / (critical_time_points[1]-critical_time_points[0])
-            self.gamma[node] = 1 / (critical_time_points[3]-critical_time_points[1])
+            self.sigma[node] = 1 / critical_time_points[0] # E to Ipre
+            self.lamda[node] = 1 / (critical_time_points[2]-critical_time_points[0]) # Ipre to Isym
+            self.gamma[node] = 1 / (critical_time_points[4]-critical_time_points[2]) # Isym to R
         
         self.initialize_VL()
 
@@ -191,11 +196,11 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 self.current_VL[node] = 0
                 self.infection_start_times[node] = 0
             elif state[0] in (3, 13): # I_pre, Q_pre
-                self.current_VL[node] = self.VL_params_by_node[node]["peak_plateau_height"]
-                self.infection_start_times[node] = - self.VL_params_by_node[node]["critical_time_points"][0] # -start_peak_time
+                self.current_VL[node] = self.VL_params_by_node[node]["tail_height"]
+                self.infection_start_times[node] = - self.VL_params_by_node[node]["critical_time_points"][0] 
             elif state[0] in (4, 14): # I_sym, Q_sym
                 self.current_VL[node] = self.VL_params_by_node[node]["peak_plateau_height"]
-                self.infection_start_times[node] = - self.VL_params_by_node[node]["critical_time_points"][1] # -end_peak_time
+                self.infection_start_times[node] = - self.VL_params_by_node[node]["critical_time_points"][2] 
 
         self.save_VL_timeseries()
 
@@ -225,15 +230,17 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         nodes_to_update = list(set(nodes_to_include) - set(nodes_to_exclude))
 
         for node in nodes_to_update:
-            start_peak_time, end_peak_time, start_tail_time, end_tail_time = self.VL_params_by_node[node]["critical_time_points"]
+            half_peak_time, start_peak_time, end_peak_time, start_tail_time, end_tail_time = self.VL_params_by_node[node]["critical_time_points"]
             peak_plateau_height = self.VL_params_by_node[node]["peak_plateau_height"]
             tail_height = self.VL_params_by_node[node]["tail_height"]
 
             # if node is not infected, self.t - self.infection_start_times[node] is negative
             if self.infection_start_times[node] < self.t:
                 sample_time = self.t - self.infection_start_times[node]
-                if sample_time < start_peak_time:
-                    vl = peak_plateau_height / start_peak_time * sample_time
+                if sample_time < half_peak_time:
+                    vl = tail_height / half_peak_time * sample_time
+                elif sample_time < start_peak_time:
+                    vl = tail_height + (peak_plateau_height - tail_height) / (start_peak_time - half_peak_time) * (sample_time - half_peak_time)
                 elif sample_time < end_peak_time:
                     vl = peak_plateau_height
                 elif sample_time < start_tail_time:

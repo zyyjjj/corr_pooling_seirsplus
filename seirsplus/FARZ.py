@@ -32,7 +32,7 @@ def random_choice(values, weights=None , size = 1, replace = True):
 
 class Comms:
      def __init__(self, k):
-         self.k = k
+         self.k = k # number of communities
          self.groups = [[] for i in range(k)]
          self.memberships = {}
          
@@ -235,6 +235,7 @@ def select_node(G, method = 'uniform'):
 def assign(i, C, e=1, r=1, q = 0.5):
     p = [e +len(c) for c in C.groups]
     id = random_choice(range(C.k),p )
+    # print(C.k, p, id)
     C.add(id, i)
     for j in range(1,r): #todo add strength for fuzzy
         if (random.random()<q): 

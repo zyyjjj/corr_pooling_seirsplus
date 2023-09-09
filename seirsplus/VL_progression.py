@@ -82,10 +82,13 @@ def _get_vl_with_plateau(
         A float representing the log10 VL at the given time.
     """
 
-    start_peak_time, start_decay_time, start_tail_time, end_tail_time = critical_time_points
+    half_peak_time, start_peak_time, start_decay_time, start_tail_time, end_tail_time = critical_time_points
 
-    if sample_time < start_peak_time:
-        vl = peak_plateau_height / start_peak_time * sample_time
+
+    if sample_time < half_peak_time:
+        vl = tail_height / half_peak_time * sample_time
+    elif sample_time < start_peak_time:
+        vl = tail_height + (peak_plateau_height - tail_height) / (start_peak_time - half_peak_time) * (sample_time - half_peak_time)
     elif sample_time < start_decay_time:
         vl = peak_plateau_height
     elif sample_time < start_tail_time:

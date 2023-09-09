@@ -72,6 +72,13 @@ class OneStageGroupTesting:
                 [sum([v > 0 for v in vl]) for vl in self.viral_loads],
             )
         )
+        # number of positives expected to be identifiable by individual test
+        num_identifiable_positives_per_pool = list(
+            filter(
+                lambda x: x > 0,
+                [sum([v*self.pcr_params["c_1"]*self.pcr_params["xi"]*self.pcr_params["c_2"]*self.pcr_params["V_sample"]>self.pcr_params["LoD"] for v in vl]) for vl in self.viral_loads],
+            )
+        )
         num_positives = sum(num_positives_per_pool)
         num_identified = sum([sum(pool_res) for pool_res in res])
         if num_positives:
@@ -82,6 +89,7 @@ class OneStageGroupTesting:
             "sensitivity": sensitivity,
             "num_tests": num_tests,
             "num_positives_per_positive_pool": num_positives_per_pool,
+            "num_identifiable_positives_per_positive_pool": num_identifiable_positives_per_pool,
             "num_positives": num_positives,
             "num_identified": num_identified,
         }
