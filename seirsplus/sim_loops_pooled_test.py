@@ -33,6 +33,7 @@ class SimulationRunner:
         verbose: bool = False,
         max_dt: Optional[float] = None,
         community_size: int = None,
+        dilute: bool = True,
     ):
         r"""Initialize the simulation runner.
 
@@ -65,8 +66,15 @@ class SimulationRunner:
         self.max_dt = max_dt
         self.num_groups = num_groups
         self.pool_size = pool_size
-        self.community_size = community_size if community_size else 5*self.pool_size
-        self.LoD = LoD
+        self.community_size = community_size if community_size else 2*self.pool_size
+        self.pcr_params={
+            "V_sample": 1,
+            "c_1": 1/10,
+            "xi": 1/2,
+            "c_2": 1,
+            "LoD": LoD,
+            "dilute": dilute
+        }
         self.screening_groups = self.get_groups(
             graph=self.model.G_weighted,
             cluster_size=math.ceil(self.model.numNodes / self.num_groups),
@@ -190,19 +198,17 @@ class SimulationRunner:
         viral_loads = [
             [int(10 ** self.model.current_VL[x]) for x in pool] for pool in pools
         ]
-        # print([viral_loads[x] for x in range(len(viral_loads)) if sum(viral_loads[x]) > 0])
-        print("Viral loads in positive pools: ", [
-            [self.model.current_VL[x] for x in pool if self.model.current_VL[x]>0] for pool,vl in zip(pools,viral_loads) if max(vl)>0])
+        viral_loads_in_positive_pools = [
+            [
+                (x, np.round(self.model.infection_start_times[x],2), np.round(self.model.current_VL[x],2)) 
+                for x in pool if self.model.current_VL[x]>0
+            ] for pool,vl in zip(pools,viral_loads) if max(vl)>0
+        ]
+        print("Viral loads in positive pools: ", viral_loads_in_positive_pools)
         group_testing = OneStageGroupTesting(
             ids=pools, 
             viral_loads=viral_loads,
-            pcr_params={
-                "V_sample": 1,
-                "c_1": 1/10,
-                "xi": 1/2,
-                "c_2": 1,
-                "LoD": self.LoD
-            }
+            pcr_params=self.pcr_params
         )
         test_results, diagnostics = group_testing.run_one_stage_group_testing()
 
@@ -221,7 +227,8 @@ class SimulationRunner:
                 if test_results[pool_idx][individual_idx] == 1:
                     self.model.set_positive(individual, True)
                     self.model.set_isolation(individual, True)
-                    num_susceptible_neighbors_of_identified += num_susceptible_neighbors
+                    self.model.isolation_start_times[individual] = self.model.t
+                    num_susceptible_neighbors_of_identified += num_susceptible_neighbors # TODO: use set() to prevent double counting
                 else:
                     if viral_loads[pool_idx][individual_idx] > 0:
                         num_susceptible_neighbors_of_unidentified += num_susceptible_neighbors
@@ -262,11 +269,15 @@ class SimulationRunner:
             + self.model.numQ_asym[self.model.tidx]
         )
         performance["mean_num_positives_in_positive_pool"] = np.mean(diagnostics["num_positives_per_positive_pool"])
+        performance["mean_num_identifiable_positives_in_positive_pool"] = np.mean(diagnostics["num_identifiable_positives_per_positive_pool"])
+        performance["median_num_positives_in_positive_pool"] = np.median(diagnostics["num_positives_per_positive_pool"])
+        performance["median_num_identifiable_positives_in_positive_pool"] = np.median(diagnostics["num_identifiable_positives_per_positive_pool"])
         performance["daily_sensitivity"] = np.divide(diagnostics["num_identified"], diagnostics["num_positives"])
         performance["daily_effective_efficiency"] = np.divide(diagnostics["num_identified"], diagnostics["num_tests"])
         performance["daily_effective_followup_efficiency"] = np.divide(diagnostics["num_identified"], (diagnostics["num_tests"] - len(test_results)))
         performance["num_susceptible_neighbors_of_identified_positives"] = num_susceptible_neighbors_of_identified
         performance["num_susceptible_neighbors_of_unidentified_positives"] = num_susceptible_neighbors_of_unidentified
+        performance["VL_in_positive_pools"] = viral_loads_in_positive_pools
 
         self.overall_results.append(performance)
 

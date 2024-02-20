@@ -118,15 +118,18 @@ def run_one_PCR_test(
     xi = params["xi"]
     c_2 = params["c_2"]
     LoD = params["LoD"]
+    dilute = params.get("dilute", True)
 
     if individual:
         N_templates = np.random.binomial(V_sample * np.array(mu), c_1 * xi * c_2)
         return list(N_templates >= LoD)
 
-    pool_size = len(mu)
+    dilution_factor = 1 if not dilute else len(mu)
+
     # copies of RNA in a subsample that is c_1 of the original volume
-    N_subsamples = np.random.binomial(V_sample * np.array(mu), c_1 / pool_size)
+    N_subsamples = np.random.binomial(V_sample * np.array(mu), c_1 / dilution_factor)
     N_pre_extraction = np.sum(N_subsamples)
     # copies of extracted RNA in the PCR template
     N_templates = np.random.binomial(N_pre_extraction, xi * c_2)
+    
     return N_templates >= LoD
