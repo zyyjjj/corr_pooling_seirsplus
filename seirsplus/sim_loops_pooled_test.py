@@ -33,7 +33,7 @@ class SimulationRunner:
         verbose: bool = False,
         max_dt: Optional[float] = None,
         community_size: int = None,
-        dilute: bool = True,
+        dilute: str = "average",
     ):
         r"""Initialize the simulation runner.
 

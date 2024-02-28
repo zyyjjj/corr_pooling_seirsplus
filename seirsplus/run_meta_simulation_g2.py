@@ -22,26 +22,7 @@ from seirsplus.networks import (
     household_country_data,
 )
 from seirsplus.sim_loops_pooled_test import SimulationRunner
-from seirsplus.viral_model import ViralExtSEIRNetworkModel
-
-VL_PARAMS = {
-    "symptomatic": {
-        "start_peak": (2.19, 5.26), 
-        "dt_peak": (1, 3), 
-        "dt_decay": (7, 10), 
-        "dt_tail": (5, 6), 
-        "peak_height": (7, 7),
-        "tail_height": (3, 3)
-    },
-    "asymptomatic": {
-        "start_peak": (2.19, 5.26), 
-        "dt_peak": (1, 3), 
-        "dt_decay": (7, 10), 
-        "dt_tail": (5, 6), 
-        "peak_height": (7, 7),
-        "tail_height": (3, 3)
-    }
-}
+from seirsplus.viral_model import ViralExtSEIRNetworkModel, VL_PARAMS
 
 
 def run_simulation(
@@ -60,6 +41,8 @@ def run_simulation(
     alpha: float,
     peak_VL: float, 
     pooling_strategy: str,
+    distancing_scale: float = None,
+    dilute: str = "average",
     country: str = "US",
     output_path: Optional[str] = None,
     save_results: Optional[bool] = True,
@@ -79,8 +62,12 @@ def run_simulation(
         edge_weight: Weight to assign to intra-household edges.
         alpha: Susceptibility multiplier.
         peak_VL: Peak viral load.
-        pooling_strategy: The pooling strategy to use. Must be one of "naive"
-            and "correlated".
+        pooling_strategy: The pooling strategy to use. Must be one of "naive", 
+            "correlated", and "correlated_weak".
+        distancing_scale: Parameter in generating the population network, which
+            prescribes the extent of social distancing. If None, then no social
+            distancing is applied.
+        dilute: dilution scheme, one of {"average", "sum", "max", "max_average"}
         country: Country whose household size distribution we use.
         output_path: The directory to save the simulation results to.
         save_results: Whether to save the simulation results, default True.
@@ -96,11 +83,15 @@ def run_simulation(
     demographic_graphs, _, households = generate_demographic_contact_network(
         N=pop_size,
         demographic_data=household_country_data(country),
-        distancing_scales=[0.7],
+        distancing_scales=[distancing_scale] if distancing_scale is not None else [],
         isolation_groups=[],
     )
 
-    G = demographic_graphs["baseline"]
+    if distancing_scale is None:
+        print("No social distancing applied.")
+        G = demographic_graphs["baseline"]
+    else:
+        G = demographic_graphs[f'distancingScale{distancing_scale}']
     G_weighted = copy.deepcopy(G) # for assigning screening groups / pools
     for e in G.edges():
         if "weight" not in G[e[0]][e[1]]:
@@ -150,7 +141,8 @@ def run_simulation(
         seed=seed,
         output_path=output_path,
         save_results=save_results,
-        max_dt=0.01
+        max_dt=0.01,
+        dilute=dilute
     )
 
     # run simulation
@@ -176,6 +168,9 @@ def parse():
     parser.add_argument("--alpha", type = float, default = 1.0)
     parser.add_argument("--country", type = str, default = "US")
     parser.add_argument("--peak_VL", type = float, default = 6) 
+    parser.add_argument("--distancing_scale", type = float)
+    parser.add_argument("--pooling_method", type = str, nargs = "+", default = ["naive", "correlated"])
+    parser.add_argument("--dilute", type = str, default = "average")
 
     args = parser.parse_args()
 
@@ -183,7 +178,8 @@ def parse():
 
 
 def run_simulation_wrapper(kwargs):
-    for pooling_strategy in ["naive", "correlated"]:
+    # for pooling_strategy in ["naive", "correlated"]:
+    for pooling_strategy in kwargs["pooling_method"]:
         print(kwargs)
         print("Running simulation with pooling strategy: ", pooling_strategy)
         kwargs_ = copy.deepcopy(kwargs)
@@ -202,9 +198,11 @@ if __name__ == "__main__":
     path = "../../results/" + args["country"]
     for param in [
         "pop_size", "init_prev", "num_groups", "pool_size", "horizon", 
-        "beta", "sigma", "lamda", "gamma", "LoD", "edge_weight", "alpha", "peak_VL"
+        "beta", "sigma", "lamda", "gamma", "LoD", "edge_weight", "alpha", 
+        "peak_VL", "distancing_scale", "dilute"
     ]:
-        path += f"_{param}={args[param]}"
+        if args[param] is not None:
+            path += f"_{param}={args[param]}"
     path += "/"
     args["output_path"] = path
 

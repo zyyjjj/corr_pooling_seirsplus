@@ -2004,7 +2004,6 @@ class ExtSEIRSNetworkModel():
         #----------------------------------------
         # Testing-related parameters:
         #----------------------------------------
-        # TODO: may need to update psi every time step, depending on how many days you've been in which disease state
 
         self.beta_Q         = (numpy.array(self.parameters['beta_Q']).reshape((self.numNodes, 1))       if isinstance(self.parameters['beta_Q'], (list, numpy.ndarray)) else numpy.full(fill_value=self.parameters['beta_Q'], shape=(self.numNodes,1))) if self.parameters['beta_Q'] is not None else self.beta
         self.sigma_Q        = (numpy.array(self.parameters['sigma_Q']).reshape((self.numNodes, 1))      if isinstance(self.parameters['sigma_Q'], (list, numpy.ndarray)) else numpy.full(fill_value=self.parameters['sigma_Q'], shape=(self.numNodes,1))) if self.parameters['sigma_Q'] is not None else self.sigma

@@ -118,17 +118,25 @@ def run_one_PCR_test(
     xi = params["xi"]
     c_2 = params["c_2"]
     LoD = params["LoD"]
-    dilute = params.get("dilute", True)
+    dilute = params.get("dilute", "average") # one of {"average", "sum", "max", "max_average"}
 
     if individual:
         N_templates = np.random.binomial(V_sample * np.array(mu), c_1 * xi * c_2)
         return list(N_templates >= LoD)
 
-    dilution_factor = 1 if not dilute else len(mu)
+    # number of copies of RNA in a subsample is c_1 of the original volume
+    # then apply different dilution schemes
+    if dilute == "average":
+        N_pre_extraction = np.sum(np.random.binomial(V_sample * np.array(mu), c_1 / len(mu)))
+    elif dilute == "sum":
+        N_pre_extraction = np.sum(np.random.binomial(V_sample * np.array(mu), c_1))
+    elif dilute == "max":
+        N_pre_extraction = np.random.binomial(V_sample * np.max(mu), c_1)
+    elif dilute == "max_average":
+        N_pre_extraction = np.random.binomial(V_sample * np.max(mu), c_1 / len(mu))
+    else:
+        raise RuntimeError("Unrecognized dilution scheme!")
 
-    # copies of RNA in a subsample that is c_1 of the original volume
-    N_subsamples = np.random.binomial(V_sample * np.array(mu), c_1 / dilution_factor)
-    N_pre_extraction = np.sum(N_subsamples)
     # copies of extracted RNA in the PCR template
     N_templates = np.random.binomial(N_pre_extraction, xi * c_2)
     

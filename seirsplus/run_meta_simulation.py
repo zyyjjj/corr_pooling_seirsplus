@@ -67,9 +67,10 @@ def run_simulation(
     )
     G = demographic_graphs["baseline"]
     # assign higher weights to inter-household edges
-    for e in G.edges():
-        if "weight" not in G[e[0]][e[1]]:
-            G[e[0]][e[1]]["weight"] = 10**10
+    # TODO: delete the next 3 lines
+    # for e in G.edges():
+    #     if "weight" not in G[e[0]][e[1]]:
+    #         G[e[0]][e[1]]["weight"] = 10**10
 
     # initiate SEIR+ model
     init_exposed = int(init_prev * pop_size)
