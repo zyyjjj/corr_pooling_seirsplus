@@ -404,7 +404,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 nodesExitingIsolation = numpy.argwhere(self.timer_isolation >= self.isolationTime)
                 for isoNode in nodesExitingIsolation:
                     self.set_isolation(node=isoNode, isolate=False)
-                    self.individual_history[isoNode]["exited_isolated"].append(
+                    self.individual_history[isoNode[0]]["exited_isolation"].append(
                         {
                             "time": self.t,
                             "state": self.X[isoNode][0],
@@ -555,7 +555,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         nodesExitingIsolation = numpy.argwhere(self.timer_isolation >= self.isolationTime)
         for isoNode in nodesExitingIsolation:
             self.set_isolation(node=isoNode, isolate=False)
-            self.individual_history[isoNode]["exited_isolated"].append(
+            self.individual_history[isoNode[0]]["exited_isolation"].append(
                 {
                     "time": self.t,
                     "state": self.X[isoNode][0],

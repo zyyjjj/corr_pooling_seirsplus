@@ -297,11 +297,21 @@ class SimulationRunner:
 
         self.overall_results.append(performance)
 
+        individual_info = {
+            "individual_history": dict(self.model.individual_history),
+            "blame_history": dict(self.model.blame_history)
+        }
+
         if self.save_results:
             with open(
                 os.path.join(self.output_path, f"results_{self.seed}.pickle"), "wb"
             ) as f:
                 pickle.dump(self.overall_results, f)
+
+            with open(
+                os.path.join(self.output_path, f"individual_results_{self.seed}.pickle"), "wb"
+            ) as f:
+                pickle.dump(individual_info, f)
 
     def run_simulation(self):
         r"""
