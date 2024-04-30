@@ -229,9 +229,25 @@ class SimulationRunner:
                     self.model.set_isolation(individual, True)
                     self.model.isolation_start_times[individual] = self.model.t
                     num_susceptible_neighbors_of_identified += num_susceptible_neighbors # TODO: use set() to prevent double counting
+                    self.model.individual_history[individual]["isolated"].append(
+                        {
+                            "time": self.model.t,
+                            "infection_state": self.model.X[individual][0],
+                            "VL": self.model.current_VL[individual],
+                        }
+                    )
                 else:
-                    if viral_loads[pool_idx][individual_idx] > 0:
+                    if viral_loads[pool_idx][individual_idx] > 0: # TODO: also log the identity of missed positives
                         num_susceptible_neighbors_of_unidentified += num_susceptible_neighbors
+                        self.model.individual_history[individual]["tested_and_missed"].append(
+                            {
+                                "time": self.model.t,
+                                "infection_state": self.model.X[individual][0],
+                                "VL": self.model.current_VL[individual],
+                                "test_result": 0,
+                                "false_negative": True
+                            }
+                        )
 
         self.daily_results.append(diagnostics)
 
@@ -347,8 +363,6 @@ class SimulationRunner:
             cum_sensitivity = float("nan")
 
         cum_num_tests = sum([result["num_tests"] for result in self.daily_results])
-        # TODO: also need to retrive number of positives per pool
-        # [result["num_positives"] for result in self.daily_results] -- this is wrong, not per-pool
 
         return {
             "cum_positives_screened": cum_positives_screened,

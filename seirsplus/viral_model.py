@@ -175,6 +175,9 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         self.sec_infs_household = defaultdict(int)
         self.sec_infs_non_household = defaultdict(int)
 
+        self.individual_history = defaultdict(lambda: defaultdict(list))
+        self.blame_history = defaultdict(list)
+
                     
     def save_VL_timeseries(self):
         r"""
@@ -184,6 +187,7 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         self.VL_over_time["time_points"].append(self.t)
         for node in range(self.numNodes):
             self.VL_over_time["VL_time_series"][node].append(self.current_VL[node])
+
 
     def initialize_VL(self):
         r"""
@@ -248,8 +252,6 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 elif sample_time < end_tail_time:
                     vl = tail_height
                 else:
-                    # print(f"self.t: {self.t}, self.infection_start_times[node]: {self.infection_start_times[node]}, sample_time: {sample_time}")
-                    # print(f"start_peak_time: {start_peak_time}, end_peak_time: {end_peak_time}, start_tail_time: {start_tail_time}, end_tail_time: {end_tail_time}")
                     vl = -1
                 
                 self.current_VL[node] = vl
@@ -262,8 +264,8 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         non_household_neighbors = list(set(neighbors) - set(household_neighbors))
 
         print(f"infected: {infected}, transmissionTerms_I: {self.transmissionTerms_I[infected]}, transmissionTerms_Q: {self.transmissionTerms_Q[infected]}, household_neighbors: {household_neighbors}, non_household_neighbors: {non_household_neighbors}")
-        print(f"Household member states: {[self.X[j] for j in household_neighbors]}")
-        print(f"Non-household member states: {[self.X[j] for j in non_household_neighbors]}")
+        print(f"Household member states: {[self.X[j][0] for j in household_neighbors]}")
+        print(f"Non-household member states: {[self.X[j][0] for j in non_household_neighbors]}")
 
 
         if len(neighbors) == 0:
@@ -294,6 +296,32 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                     out=numpy.array([0.]), where=self.transmissionTerms_Q[infected]!=0)
                 total_contribution_Q[j] = round(contribution.item(), 3)
         
+        # log infected info in individual history
+        self.individual_history[infected]["infected"].append(
+            {
+                "time": self.t,
+                "state": self.X[infected],
+                "VL": self.current_VL[infected],
+                "household_members_states": [(j, self.X[j][0]) for j in household_neighbors], 
+                "non_household_members_states": [(j, self.X[j][0]) for j in non_household_neighbors],
+            }
+        )
+
+        # assign blame to possible infectors
+        for contribution_log in [total_contribution, total_contribution_Q]:
+            for j, c in contribution_log.items(): 
+                self.blame_history[j].append(
+                    {
+                        "time": self.t,
+                        "state": self.X[j][0],
+                        "VL": self.current_VL[j],
+                        "infected_node": infected,
+                        "contribution": c,
+                        "edge_weight": self.A[infected, j]
+                    }
+                )
+        
+
         print(f"Infected node {infected} got contribution from infectious contacts {total_contribution} and quarantined contacts {total_contribution_Q}")
 
 
@@ -376,6 +404,13 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                 nodesExitingIsolation = numpy.argwhere(self.timer_isolation >= self.isolationTime)
                 for isoNode in nodesExitingIsolation:
                     self.set_isolation(node=isoNode, isolate=False)
+                    self.individual_history[isoNode]["exited_isolated"].append(
+                        {
+                            "time": self.t,
+                            "state": self.X[isoNode][0],
+                            "VL": self.current_VL[isoNode]
+                        }
+                    )
                 # return without any further event execution
                 return True
             else:
@@ -403,7 +438,6 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
                                 p_list.append((transitionTypes[i_p], p))
                         print(f"        node{i}, in state {self.X[i]}, propensity {p_list}")
                     
-
             if self.verbose >= 1:
                 if transitionType in ("EtoIPRE", "QEtoQPRE"):
                     print(f"-- node {transitionNode} is transitioning {transitionType} at time {self.t} with timer_state: {self.timer_state[transitionNode]}; 1/sigma: {1.0/self.sigma[transitionNode]}; VL: {self.current_VL[transitionNode]}")
@@ -521,6 +555,13 @@ class ViralExtSEIRNetworkModel(ExtSEIRSNetworkModel):
         nodesExitingIsolation = numpy.argwhere(self.timer_isolation >= self.isolationTime)
         for isoNode in nodesExitingIsolation:
             self.set_isolation(node=isoNode, isolate=False)
+            self.individual_history[isoNode]["exited_isolated"].append(
+                {
+                    "time": self.t,
+                    "state": self.X[isoNode][0],
+                    "VL": self.current_VL[isoNode]
+                }
+            )
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Store system states

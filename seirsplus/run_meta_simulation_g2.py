@@ -92,7 +92,7 @@ def run_simulation(
         G = demographic_graphs["baseline"]
     else:
         G = demographic_graphs[f'distancingScale{distancing_scale}']
-    G_weighted = copy.deepcopy(G) # for assigning screening groups / pools
+    G_weighted = copy.deepcopy(G) # for assigning screening groups / pools only
     for e in G.edges():
         if "weight" not in G[e[0]][e[1]]:
             G[e[0]][e[1]]["weight"] = edge_weight
